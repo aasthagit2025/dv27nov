@@ -2,7 +2,7 @@ import streamlit as st
 import pandas as pd
 import numpy as np
 import io
-import uuid # For generating unique keys
+import uuid 
 
 # --- Configuration ---
 FLAG_PREFIX = "xx" 
@@ -45,14 +45,9 @@ def generate_skip_spss_syntax(target_col, trigger_col, trigger_val, rule_type, r
     if rule_type == 'SQ' and range_min is not None and range_max is not None:
         # For SQ, include the range check in the EoO logic
         eoo_condition = f"(miss({target_col}) | ~range({target_col},{range_min},{range_max}))"
-    elif rule_type in ['MQ', 'Ranking', 'String']:
-        # MQ/Ranking/String typically only need a MISS check for skip logic, unless complex data structure
+    elif rule_type == 'String':
         # For String, check for missing or empty string
-        if rule_type == 'String':
-            eoo_condition = f"({target_col}='' | miss({target_col}))"
-        else:
-            eoo_condition = f"miss({target_col})"
-
+        eoo_condition = f"({target_col}='' | miss({target_col}))"
 
     syntax.append(f"**************************************SKIP LOGIC EoO/EoC CHECK: {target_col} -> {flag_col}")
     
@@ -85,7 +80,7 @@ def generate_sq_spss_syntax(col, min_val, max_val, required_stubs_list):
         syntax.append(f"**************************************SQ Specific Stub Check: {col} (NOT IN: {stubs_str})")
         syntax.append(f"IF(~miss({col}) & NOT(any({col}, {stubs_str}))) {flag_any}=1.")
         syntax.append(f"EXECUTE.\n")
-    return syntax, [flag_name] # Returns list of flags generated
+    return syntax, [flag_name] 
 
 def generate_mq_spss_syntax(cols, min_count, max_count, exclusive_col, count_method):
     """Generates detailed SPSS syntax for a single Multi-Select group check."""
@@ -267,7 +262,7 @@ def generate_master_spss_syntax(sq_rules, mq_rules, ranking_rules, string_rules)
             sps_content.append(f"VALUE LABELS {flag} 0 'Pass' 1 'Fail: Error of Omission' 2 'Fail: Error of Commission'.")
         elif flag.startswith('Flag_'):
              sps_content.append(f"VALUE LABELS {flag} 0 'Pass' 1 'Filter Flag (Intermediate)'.") 
-        elif flag.startswith(FLAG_PREFIX):
+        elif flag.startswith(FLAG_PREFIX) and not flag.endswith('_Count'):
             sps_content.append(f"VALUE LABELS {flag} 0 'Pass' 1 'Fail: Data Check'.")
             
     sps_content.append("EXECUTE.\n")
@@ -281,7 +276,7 @@ def generate_master_spss_syntax(sq_rules, mq_rules, ranking_rules, string_rules)
         temp_flags = []
         
         # Only count the flags that represent a true error (xx* flags, not the intermediate Flag_Qx filter)
-        error_flags_to_count = [f for f in master_error_flags if f.startswith(FLAG_PREFIX)]
+        error_flags_to_count = [f for f in master_error_flags if f.startswith(FLAG_PREFIX) and not f.endswith('_Count')]
         
         for flag in error_flags_to_count:
             temp_name = f"T_{flag}"
@@ -310,59 +305,45 @@ def generate_master_spss_syntax(sq_rules, mq_rules, ranking_rules, string_rules)
     return "\n".join(sps_content)
 
 
+def generate_excel_report(df, flag_cols):
+    """Generates a placeholder Excel error report as bytes."""
+    output = io.BytesIO()
+    with pd.ExcelWriter(output, engine='xlsxwriter') as writer:
+        status_df = pd.DataFrame([["Validation rules successfully defined. Download the SPSS file to view logic."]], columns=['Status'])
+        status_df.to_excel(writer, sheet_name='Validation Status', index=False)
+            
+    return output.getvalue()
+
+
 def clear_all_rules():
     st.session_state.sq_rules = []
     st.session_state.mq_rules = []
     st.session_state.ranking_rules = []
     st.session_state.string_rules = []
+    st.success("All rules cleared.")
+
 
 # --- UI Rule Management Functions ---
 
-def display_sq_rules():
-    if st.session_state.sq_rules:
-        st.subheader("Current SQ Rules")
-        df_rules = pd.DataFrame(st.session_state.sq_rules)
-        df_display = df_rules[['variable', 'min_val', 'max_val', 'run_skip', 'trigger_col', 'trigger_val']].rename(
-            columns={'variable': 'Target Var', 'min_val': 'Min', 'max_val': 'Max', 
-                     'run_skip': 'Skip Enabled', 'trigger_col': 'Trigger Var', 'trigger_val': 'Trigger Val'}
-        )
-        st.dataframe(df_display, use_container_width=True, hide_index=True)
-        st.markdown("---")
-
-def display_mq_rules():
-    if st.session_state.mq_rules:
-        st.subheader("Current MQ Rules")
-        df_rules = pd.DataFrame(st.session_state.mq_rules)
-        df_rules['Variables'] = df_rules['variables'].apply(lambda x: f"{x[0]}... ({len(x)} vars)")
-        df_display = df_rules[['Variables', 'min_count', 'max_count', 'exclusive_col', 'count_method', 'run_skip', 'trigger_col', 'trigger_val']].rename(
-            columns={'min_count': 'Min Count', 'max_count': 'Max Count', 
-                     'exclusive_col': 'Exclusive', 'count_method': 'Method',
-                     'run_skip': 'Skip Enabled', 'trigger_col': 'Trigger Var', 'trigger_val': 'Trigger Val'}
-        )
-        st.dataframe(df_display, use_container_width=True, hide_index=True)
-        st.markdown("---")
-        
-def display_ranking_rules():
-    if st.session_state.ranking_rules:
-        st.subheader("Current Ranking Rules")
-        df_rules = pd.DataFrame(st.session_state.ranking_rules)
-        df_rules['Variables'] = df_rules['variables'].apply(lambda x: f"{x[0]}... ({len(x)} vars)")
-        df_display = df_rules[['Variables', 'min_rank', 'max_rank', 'run_skip', 'trigger_col', 'trigger_val']].rename(
-            columns={'min_rank': 'Min Rank', 'max_rank': 'Max Rank', 
-                     'run_skip': 'Skip Enabled', 'trigger_col': 'Trigger Var', 'trigger_val': 'Trigger Val'}
-        )
-        st.dataframe(df_display, use_container_width=True, hide_index=True)
-        st.markdown("---")
-
-def display_string_rules():
-    if st.session_state.string_rules:
-        st.subheader("Current String Rules")
-        df_rules = pd.DataFrame(st.session_state.string_rules)
-        df_display = df_rules[['variable', 'min_length', 'run_skip', 'trigger_col', 'trigger_val']].rename(
-            columns={'variable': 'Target Var', 'min_length': 'Min Length', 
-                     'run_skip': 'Skip Enabled', 'trigger_col': 'Trigger Var', 'trigger_val': 'Trigger Val'}
-        )
-        st.dataframe(df_display, use_container_width=True, hide_index=True)
+def display_rules(rules, columns, header):
+    if rules:
+        st.subheader(header)
+        df_rules = pd.DataFrame(rules)
+        # Ensure only relevant columns are displayed, handling nested lists/dictionaries
+        display_data = []
+        for rule in rules:
+            display_row = {}
+            for col in columns:
+                if col == 'variables':
+                    display_row['Variables'] = f"{rule[col][0]}... ({len(rule[col])} vars)"
+                elif col == 'variable':
+                    display_row['Target Var'] = rule[col]
+                else:
+                    display_row[col.replace('_', ' ').title()] = rule.get(col)
+            display_data.append(display_row)
+            
+        st.dataframe(pd.DataFrame(display_data), use_container_width=True, hide_index=True)
+        st.markdown("*Note: To modify a rule, clear all rules and re-add them.*")
         st.markdown("---")
 
 # --- STREAMLIT APPLICATION UI ---
@@ -376,105 +357,114 @@ if uploaded_file:
         df_raw = pd.read_csv(uploaded_file, encoding='latin-1') 
         st.success(f"Loaded {len(df_raw)} rows and {len(df_raw.columns)} columns.")
         
-        if 'uuid' not in df_raw.columns:
-            df_raw['uuid'] = df_raw.index.map(lambda x: f"Resp_{x+1}")
-        df_raw['uuid'] = df_raw['uuid'].astype(str)
-        
         st.session_state.all_cols = df_raw.columns.tolist()
-        df_validated = df_raw.copy()
         
         st.markdown("---")
         st.header("Step 2: Define Validation Rules")
-        st.sidebar.button("🗑️ Clear All Rules", on_click=clear_all_rules)
-        st.sidebar.markdown("---")
-        st.sidebar.subheader("Rule Count")
+        
+        col_side_a, col_side_b = st.sidebar.columns(2)
+        with col_side_a:
+            st.sidebar.button("🗑️ Clear All Rules", on_click=clear_all_rules)
+        with col_side_b:
+            st.sidebar.markdown(f"**Total Rules:** {len(st.session_state.sq_rules) + len(st.session_state.mq_rules) + len(st.session_state.ranking_rules) + len(st.session_state.string_rules)}")
         st.sidebar.markdown(f"**SQ Rules:** {len(st.session_state.sq_rules)}")
         st.sidebar.markdown(f"**MQ Rules:** {len(st.session_state.mq_rules)}")
-        st.sidebar.markdown(f"**Ranking Rules:** {len(st.session_state.ranking_rules)}")
-        st.sidebar.markdown(f"**String Rules:** {len(st.session_state.string_rules)}")
         
+        
+        all_variable_options = ['-- Select Variable --'] + st.session_state.all_cols
         
         # --- Single Select / Rating Check ---
-        display_sq_rules()
-        with st.expander("➕ Add Single Select / Rating Rule (SQ)", expanded=True):
+        display_rules(st.session_state.sq_rules, 
+                      ['variable', 'min_val', 'max_val', 'stubs', 'run_skip', 'trigger_col', 'trigger_val'], 
+                      "Current Single Select (SQ) Rules")
+        with st.expander("➕ Add Single Select / Rating Rule (SQ) - (One Variable at a time)", expanded=True):
             with st.form("sq_form", clear_on_submit=True):
-                col_sq_var, col_min, col_max = st.columns(3)
-                with col_sq_var:
-                    sq_col = st.selectbox("Target Variable (Qx)", st.session_state.all_cols, key=f'sq_col_{uuid.uuid4()}')
-                with col_min:
-                    sq_min = st.number_input("Minimum Valid Value (Range Check)", min_value=1, value=1, key=f'sq_min_{uuid.uuid4()}')
-                with col_max:
-                    sq_max = st.number_input("Maximum Valid Value (Range Check)", min_value=1, value=5, key=f'sq_max_{uuid.uuid4()}')
                 
-                sq_stubs_str = st.text_input("Specific Stubs (ANY) - Must be one of: e.g., '1, 3, 5' (Optional)", value='', help="Checks if the answer is *not* one of these values.")
+                # VARIABLE SELECTION (FIXED)
+                sq_col = st.selectbox("Target Variable (Qx) - Must be unique per rule", all_variable_options, key=f'sq_col_{uuid.uuid4()}')
                 
-                st.markdown("---")
-                run_sq_skip = st.checkbox(f"Add Skip Logic/Piping Check (EoO/EoC)", key=f'run_sq_skip_{uuid.uuid4()}')
-                
-                sq_trigger_col = 'None'
-                sq_trigger_val = ''
-                if run_sq_skip:
-                    col_c, col_d = st.columns(2)
-                    with col_c:
-                        sq_trigger_col = st.selectbox("Trigger Question (Q_Prev)", st.session_state.all_cols, key=f'sq_trigger_col_sl_{uuid.uuid4()}')
-                    with col_d:
-                        sq_trigger_val = st.text_input("Trigger Value (e.g., '1' for 'Yes')", value='1', key=f'sq_trigger_val_sl_{uuid.uuid4()}')
-                
-                submitted_sq = st.form_submit_button("➕ Add SQ Rule")
-                if submitted_sq:
-                    if sq_col:
-                        required_stubs = [int(s.strip()) for s in sq_stubs_str.split(',') if s.strip().isdigit()] if sq_stubs_str else None
-                        
-                        st.session_state.sq_rules.append({
-                            'variable': sq_col,
-                            'min_val': sq_min,
-                            'max_val': sq_max,
-                            'stubs': required_stubs,
-                            'run_skip': run_sq_skip,
-                            'trigger_col': sq_trigger_col,
-                            'trigger_val': sq_trigger_val,
-                        })
-                        st.success(f"SQ Rule added for **{sq_col}**.")
-                        st.rerun() # Refresh to show the new rule
-                    else:
-                        st.warning("Please select a Target Variable.")
+                if sq_col != '-- Select Variable --':
+                    col_min, col_max = st.columns(2)
+                    with col_min:
+                        sq_min = st.number_input(f"Minimum Valid Value for {sq_col}", min_value=1, value=1, key=f'sq_min_{uuid.uuid4()}')
+                    with col_max:
+                        sq_max = st.number_input(f"Maximum Valid Value for {sq_col}", min_value=1, value=5, key=f'sq_max_{uuid.uuid4()}')
+                    
+                    sq_stubs_str = st.text_input("Specific Stubs (ANY) - e.g., '1, 3, 5' (Optional)", value='', help="Checks if the answer is *not* one of these values.")
+                    
+                    st.markdown("---")
+                    st.subheader("Skip Logic (EoO/EoC) Configuration")
+                    run_sq_skip = st.checkbox(f"Enable Skip Logic for {sq_col}", key=f'run_sq_skip_{uuid.uuid4()}')
+                    
+                    sq_trigger_col = 'None'
+                    sq_trigger_val = ''
+                    if run_sq_skip:
+                        col_c, col_d = st.columns(2)
+                        with col_c:
+                            sq_trigger_col = st.selectbox("Trigger Question (Q_Prev) - e.g., Q0", st.session_state.all_cols, key=f'sq_trigger_col_sl_{uuid.uuid4()}')
+                        with col_d:
+                            sq_trigger_val = st.text_input("Trigger Value (e.g., '1' for 'Yes')", value='1', key=f'sq_trigger_val_sl_{uuid.uuid4()}')
+
+                    if st.form_submit_button("➕ Add SQ Rule"):
+                        if sq_col != '-- Select Variable --':
+                            required_stubs = [int(s.strip()) for s in sq_stubs_str.split(',') if s.strip().isdigit()] if sq_stubs_str else None
+                            
+                            st.session_state.sq_rules.append({
+                                'variable': sq_col,
+                                'min_val': sq_min,
+                                'max_val': sq_max,
+                                'stubs': required_stubs,
+                                'run_skip': run_sq_skip,
+                                'trigger_col': sq_trigger_col,
+                                'trigger_val': sq_trigger_val,
+                            })
+                            st.success(f"SQ Rule added for **{sq_col}**.")
+                            st.rerun() 
+                        else:
+                            st.warning("Please select a valid Target Variable.")
+                else:
+                    st.form_submit_button("➕ Add SQ Rule", disabled=True)
+                    st.warning("Please select a Target Variable to enable configuration.")
 
         st.markdown("---")
         
         # --- Multi-Select Check (MQ) ---
-        display_mq_rules()
-        with st.expander("➕ Add Multi-Select Rule (MQ)", expanded=True):
+        display_rules(st.session_state.mq_rules, 
+                      ['variables', 'min_count', 'max_count', 'exclusive_col', 'count_method', 'run_skip', 'trigger_col', 'trigger_val'], 
+                      "Current Multi-Select (MQ) Rules")
+        with st.expander("➕ Add Multi-Select Rule (MQ) - (Select all group variables at once)", expanded=True):
             with st.form("mq_form", clear_on_submit=True):
                 mq_cols_default = [c for c in st.session_state.all_cols if c.startswith('Q') and ('_c' in c or '_a' in c)]
-                mq_cols = st.multiselect("Select ALL Multi-Select Columns (The Group, e.g., Q1_1 to Q1_9)", st.session_state.all_cols, 
+                mq_cols = st.multiselect("Select ALL Multi-Select Columns in the Group", st.session_state.all_cols, 
                                         default=mq_cols_default, key=f'mq_cols_select_{uuid.uuid4()}')
                 
-                st.markdown("**Validation Parameters**")
-                col_a, col_b, col_c = st.columns(3)
-                with col_a:
-                    mq_min_count = st.number_input("Minimum Selections Required", min_value=0, value=1, key=f'mq_min_count_{uuid.uuid4()}')
-                with col_b:
-                    mq_max_count = st.number_input("Maximum Selections Allowed (0 for no max)", min_value=0, key=f'mq_max_count_{uuid.uuid4()}')
-                with col_c:
-                    exclusive_col = st.selectbox("Select Exclusive Stub Column (Optional)", ['None'] + mq_cols, key=f'mq_exclusive_col_{uuid.uuid4()}')
-                
-                mq_count_method = st.radio("SPSS Calculation Method", ["SUM", "COUNT"], index=0, help="SUM is generally more robust for 0/1 coded data.")
+                if mq_cols:
+                    st.markdown("**Validation Parameters**")
+                    col_a, col_b, col_c = st.columns(3)
+                    with col_a:
+                        mq_min_count = st.number_input("Minimum Selections Required", min_value=0, value=1, key=f'mq_min_count_{uuid.uuid4()}')
+                    with col_b:
+                        mq_max_count = st.number_input("Maximum Selections Allowed (0 for no max)", min_value=0, key=f'mq_max_count_{uuid.uuid4()}')
+                    with col_c:
+                        exclusive_col = st.selectbox("Select Exclusive Stub Column (Optional)", ['None'] + mq_cols, key=f'mq_exclusive_col_{uuid.uuid4()}')
+                    
+                    mq_count_method = st.radio("SPSS Calculation Method", ["SUM", "COUNT"], index=0)
 
-                st.markdown("---")
-                run_mq_skip = st.checkbox(f"Add Skip Logic/Piping Check (EoO/EoC) - uses {mq_cols[0] if mq_cols else 'None'} as proxy", key=f'run_mq_skip_{uuid.uuid4()}')
+                    st.markdown("---")
+                    st.subheader("Skip Logic (EoO/EoC) Configuration")
+                    run_mq_skip = st.checkbox(f"Enable Skip Logic - uses {mq_cols[0]} as proxy for EoO/EoC check", key=f'run_mq_skip_{uuid.uuid4()}')
 
-                mq_trigger_col = 'None'
-                mq_trigger_val = ''
-                if run_mq_skip:
-                    col_d, col_e = st.columns(2)
-                    with col_d:
-                        mq_trigger_col = st.selectbox("Trigger Question (Q_Prev)", st.session_state.all_cols, key=f'mq_trigger_col_mq_{uuid.uuid4()}')
-                    with col_e:
-                        mq_trigger_val = st.text_input("Trigger Value (e.g., '1')", value='1', key=f'mq_trigger_val_mq_{uuid.uuid4()}')
-                        
-                submitted_mq = st.form_submit_button("➕ Add MQ Rule")
-                if submitted_mq:
-                    if mq_cols:
+                    mq_trigger_col = 'None'
+                    mq_trigger_val = ''
+                    if run_mq_skip:
+                        col_d, col_e = st.columns(2)
+                        with col_d:
+                            mq_trigger_col = st.selectbox("Trigger Question (Q_Prev) - e.g., Q0", st.session_state.all_cols, key=f'mq_trigger_col_mq_{uuid.uuid4()}')
+                        with col_e:
+                            mq_trigger_val = st.text_input("Trigger Value (e.g., '1')", value='1', key=f'mq_trigger_val_mq_{uuid.uuid4()}')
+                            
+                    submitted_mq = st.form_submit_button("➕ Add MQ Rule")
+                    if submitted_mq:
                         st.session_state.mq_rules.append({
                             'variables': mq_cols,
                             'min_count': mq_min_count,
@@ -487,39 +477,44 @@ if uploaded_file:
                         })
                         st.success(f"MQ Rule added for group starting with **{mq_cols[0]}**.")
                         st.rerun()
-                    else:
-                        st.warning("Please select columns for MQ Check.")
+                else:
+                    st.form_submit_button("➕ Add MQ Rule", disabled=True)
+                    st.warning("Please select columns for MQ Check.")
 
         st.markdown("---")
 
         # --- Ranking Check ---
-        display_ranking_rules()
-        with st.expander("➕ Add Ranking Rule", expanded=False):
+        display_rules(st.session_state.ranking_rules, 
+                      ['variables', 'min_rank', 'max_rank', 'run_skip', 'trigger_col', 'trigger_val'], 
+                      "Current Ranking Rules")
+        with st.expander("➕ Add Ranking Rule (Select all rank variables at once)", expanded=False):
             with st.form("ranking_form", clear_on_submit=True):
                 rank_cols_default = [c for c in st.session_state.all_cols if c.startswith('Rank_') or c.startswith('R_')]
                 rank_cols = st.multiselect("Select ALL Ranking Columns (The Set)", st.session_state.all_cols, 
                                         default=rank_cols_default, key=f'rank_cols_select_{uuid.uuid4()}')
-                col_a, col_b = st.columns(2)
-                with col_a:
-                    rank_min = st.number_input("Minimum Expected Rank Value", min_value=1, value=1, key=f'rank_min_{uuid.uuid4()}')
-                with col_b:
-                    rank_max = st.number_input("Maximum Expected Rank Value", min_value=1, value=3, key=f'rank_max_{uuid.uuid4()}')
                 
-                st.markdown("---")
-                run_rank_skip = st.checkbox(f"Add Skip Logic/Piping Check (EoO/EoC) - uses {rank_cols[0] if rank_cols else 'None'} as proxy", key=f'run_rank_skip_{uuid.uuid4()}')
+                if rank_cols:
+                    col_a, col_b = st.columns(2)
+                    with col_a:
+                        rank_min = st.number_input("Minimum Expected Rank Value", min_value=1, value=1, key=f'rank_min_{uuid.uuid4()}')
+                    with col_b:
+                        rank_max = st.number_input("Maximum Expected Rank Value", min_value=1, value=3, key=f'rank_max_{uuid.uuid4()}')
+                    
+                    st.markdown("---")
+                    st.subheader("Skip Logic (EoO/EoC) Configuration")
+                    run_rank_skip = st.checkbox(f"Enable Skip Logic - uses {rank_cols[0]} as proxy for EoO/EoC check", key=f'run_rank_skip_{uuid.uuid4()}')
 
-                rank_trigger_col = 'None'
-                rank_trigger_val = ''
-                if run_rank_skip:
-                    col_c, col_d = st.columns(2)
-                    with col_c:
-                        rank_trigger_col = st.selectbox("Trigger Question (Q_Prev)", st.session_state.all_cols, key=f'rank_trigger_col_rank_{uuid.uuid4()}')
-                    with col_d:
-                        rank_trigger_val = st.text_input("Trigger Value (e.g., '1')", value='1', key=f'rank_trigger_val_rank_{uuid.uuid4()}')
-                
-                submitted_rank = st.form_submit_button("➕ Add Ranking Rule")
-                if submitted_rank:
-                    if rank_cols:
+                    rank_trigger_col = 'None'
+                    rank_trigger_val = ''
+                    if run_rank_skip:
+                        col_c, col_d = st.columns(2)
+                        with col_c:
+                            rank_trigger_col = st.selectbox("Trigger Question (Q_Prev) - e.g., Q0", st.session_state.all_cols, key=f'rank_trigger_col_rank_{uuid.uuid4()}')
+                        with col_d:
+                            rank_trigger_val = st.text_input("Trigger Value (e.g., '1')", value='1', key=f'rank_trigger_val_rank_{uuid.uuid4()}')
+                    
+                    submitted_rank = st.form_submit_button("➕ Add Ranking Rule")
+                    if submitted_rank:
                         st.session_state.ranking_rules.append({
                             'variables': rank_cols,
                             'min_rank': rank_min,
@@ -530,34 +525,38 @@ if uploaded_file:
                         })
                         st.success(f"Ranking Rule added for set starting with **{rank_cols[0]}**.")
                         st.rerun()
-                    else:
-                        st.warning("Please select columns for Ranking Check.")
+                else:
+                    st.form_submit_button("➕ Add Ranking Rule", disabled=True)
+                    st.warning("Please select columns for Ranking Check.")
 
         st.markdown("---")
 
         # --- String Check (Open Ends) ---
-        display_string_rules()
-        with st.expander("➕ Add String/Open-End Rule", expanded=False):
+        display_rules(st.session_state.string_rules, 
+                      ['variable', 'min_length', 'run_skip', 'trigger_col', 'trigger_val'], 
+                      "Current String Rules")
+        with st.expander("➕ Add String/Open-End Rule - (One Variable at a time)", expanded=False):
             with st.form("string_form", clear_on_submit=True):
-                string_cols_default = [c for c in st.session_state.all_cols if c.endswith('_TEXT') or c.endswith('_OE')]
-                string_col = st.selectbox("Target Variable (Qx_TEXT/OE)", st.session_state.all_cols, default=string_cols_default[0] if string_cols_default else None, key=f'string_col_select_{uuid.uuid4()}')
-                string_min_length = st.number_input("Minimum Non-Junk Length (e.g., 5 characters)", min_value=1, value=5, key=f'string_min_length_{uuid.uuid4()}')
+                string_col = st.selectbox("Target Variable (Qx_TEXT/OE) - Must be unique per rule", all_variable_options, key=f'string_col_select_{uuid.uuid4()}')
                 
-                st.markdown("---")
-                run_string_skip = st.checkbox(f"Add Skip Logic/Piping Check (EoO/EoC)", key=f'run_string_skip_{uuid.uuid4()}')
+                if string_col != '-- Select Variable --':
+                    string_min_length = st.number_input(f"Minimum Non-Junk Length for {string_col}", min_value=1, value=5, key=f'string_min_length_{uuid.uuid4()}')
+                    
+                    st.markdown("---")
+                    st.subheader("Skip Logic (EoO/EoC) Configuration")
+                    run_string_skip = st.checkbox(f"Enable Skip Logic for {string_col}", key=f'run_string_skip_{uuid.uuid4()}')
 
-                string_trigger_col = 'None'
-                string_trigger_val = ''
-                if run_string_skip:
-                    col_c, col_d = st.columns(2)
-                    with col_c:
-                        string_trigger_col = st.selectbox("Trigger Question (Q_Prev)", st.session_state.all_cols, key=f'string_trigger_col_string_{uuid.uuid4()}')
-                    with col_d:
-                        string_trigger_val = st.text_input("Trigger Value (e.g., '1')", value='1', key=f'string_trigger_val_string_{uuid.uuid4()}')
+                    string_trigger_col = 'None'
+                    string_trigger_val = ''
+                    if run_string_skip:
+                        col_c, col_d = st.columns(2)
+                        with col_c:
+                            string_trigger_col = st.selectbox("Trigger Question (Q_Prev) - e.g., Q0", st.session_state.all_cols, key=f'string_trigger_col_string_{uuid.uuid4()}')
+                        with col_d:
+                            string_trigger_val = st.text_input("Trigger Value (e.g., '1')", value='1', key=f'string_trigger_val_string_{uuid.uuid4()}')
 
-                submitted_string = st.form_submit_button("➕ Add String Rule")
-                if submitted_string:
-                    if string_col:
+                    submitted_string = st.form_submit_button("➕ Add String Rule")
+                    if submitted_string:
                         st.session_state.string_rules.append({
                             'variable': string_col,
                             'min_length': string_min_length,
@@ -567,8 +566,9 @@ if uploaded_file:
                         })
                         st.success(f"String Rule added for **{string_col}**.")
                         st.rerun()
-                    else:
-                        st.warning("Please select a Target Variable.")
+                else:
+                    st.form_submit_button("➕ Add String Rule", disabled=True)
+                    st.warning("Please select a Target Variable to enable configuration.")
             
         st.markdown("---")
         st.header("Step 3: Generate Master Syntax")
@@ -584,10 +584,9 @@ if uploaded_file:
                 st.session_state.ranking_rules, 
                 st.session_state.string_rules
             )
-            # Placeholder for Excel report generation (using a dummy function as actual data flagging is skipped for efficiency)
             excel_report_bytes = generate_excel_report(df_validated, [])
             
-            st.success(f"Generated complete syntax for {total_rules} validation rules.")
+            st.success(f"Generated complete syntax for **{total_rules}** validation rules.")
             
             col_a, col_b = st.columns(2)
             
@@ -606,14 +605,36 @@ if uploaded_file:
                     mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
                 )
                 
-            st.subheader("Preview of Generated Detailed SPSS Logic")
-            # Display a preview of the generated syntax
-            preview_syntax_list = [item for sublist in [generate_sq_spss_syntax(r['variable'], r['min_val'], r['max_val'], r['stubs'])[0] for r in st.session_state.sq_rules] + 
-                                                    [generate_mq_spss_syntax(r['variables'], r['min_count'], r['max_count'], r['exclusive_col'], r['count_method'])[0] for r in st.session_state.mq_rules] + 
-                                                    [generate_ranking_spss_syntax(r['variables'], r['min_rank'], r['max_rank'])[0] for r in st.session_state.ranking_rules] + 
-                                                    [generate_string_spss_syntax(r['variable'], r['min_length'])[0] for r in st.session_state.string_rules] 
-                                for item in sublist]
+            st.subheader("Preview of Generated Detailed SPSS Logic (Sample)")
             
+            # Generate sample syntax blocks for preview
+            preview_syntax_list = []
+            
+            # Helper to safely generate syntax and extract content
+            def get_syntax(rules, generator_func):
+                for rule in rules:
+                    # Logic here needs to match how it's used in generate_master_spss_syntax
+                    if 'variable' in rule: # SQ/String
+                        syntax, _ = generator_func(rule['variable'], rule.get('min_val', 1), rule.get('max_val', 10))
+                    elif 'variables' in rule: # MQ/Ranking
+                        syntax, _ = generator_func(rule['variables'], rule.get('min_count', rule.get('min_rank', 1)), rule.get('max_count', rule.get('max_rank', 0)), rule.get('exclusive_col'), rule.get('count_method'))
+                    else:
+                        continue
+                        
+                    preview_syntax_list.extend(syntax)
+                    
+                    if rule.get('run_skip'):
+                        target = rule.get('variable') or rule['variables'][0]
+                        sl_type = 'SQ' if 'min_val' in rule else 'MQ' if 'min_count' in rule else 'Ranking' if 'min_rank' in rule else 'String'
+                        sl_syntax, _ = generate_skip_spss_syntax(target, rule['trigger_col'], rule['trigger_val'], sl_type, rule.get('min_val'), rule.get('max_val'))
+                        preview_syntax_list.extend(sl_syntax)
+
+            # Manually call generators with dummy values for preview clarity
+            get_syntax(st.session_state.sq_rules[:1], generate_sq_spss_syntax)
+            get_syntax(st.session_state.mq_rules[:1], generate_mq_spss_syntax)
+            get_syntax(st.session_state.ranking_rules[:1], generate_ranking_spss_syntax)
+            get_syntax(st.session_state.string_rules[:1], generate_string_spss_syntax)
+
             preview_syntax = '\n'.join(preview_syntax_list)
             st.code(preview_syntax[:1500] + "\n\n...(Download the .sps file for the complete detailed syntax)", language='spss')
             
@@ -622,4 +643,4 @@ if uploaded_file:
             
 
     except Exception as e:
-        st.error(f"An error occurred during processing. Error: {e}")
+        st.error(f"An error occurred during processing. Please ensure your CSV is valid. Error: {e}")
