@@ -1,4 +1,4 @@
-import streamlit as st
+\import streamlit as st
 import pandas as pd
 import numpy as np
 import io
@@ -43,6 +43,7 @@ def generate_skip_spss_syntax(target_col, trigger_col, trigger_val, rule_type, r
     
     # Stage 1: Filter Flag (Flag_Qx) - Identifies who should have seen the question (Matches user example)
     syntax.append(f"**************************************SKIP LOGIC FILTER FLAG: {trigger_col}={trigger_val} -> {target_clean}")
+    syntax.append(f"COMMENT Qx should ONLY be asked if {trigger_col} = {trigger_val}.")
     syntax.append(f"IF({trigger_col} = {trigger_val}) {filter_flag}=1.")
     syntax.append(f"EXECUTE.\n")
 
@@ -145,8 +146,16 @@ def generate_sq_spss_syntax(rule):
     min_val = rule['min_val']
     max_val = rule['max_val']
     required_stubs_list = rule['required_stubs']
-    filter_flag = f"Flag_{col}"
+    filter_flag = f"Flag_{col}" # This will be the base question name, e.g., Flag_Q12
     
+    # Use the base question name for the filter flag, e.g., if col=Q12_1, target_clean=Q12
+    if '_' in col:
+        target_clean = col.split('_')[0]
+        filter_flag = f"Flag_{target_clean}" 
+    else:
+        target_clean = col
+        filter_flag = f"Flag_{col}"
+        
     syntax = []
     generated_flags = []
 
@@ -178,18 +187,16 @@ def generate_sq_spss_syntax(rule):
     # --- Combined Skip/Piping Checks ---
     
     # A. Generate Filter Flag if EITHER Skip or Piping is enabled
-    if rule['run_skip'] or rule['run_piping_check']:
-        # If piping is enabled, the skip logic is often tied to the *entire* grid (e.g., Q12), 
-        # so we take the base question name for the filter flag.
+    if (rule['run_skip'] or rule['run_piping_check']) and rule['trigger_col'] != '-- Select Variable --':
         trigger_col = rule['trigger_col']
         trigger_val = rule['trigger_val']
         
-        # We assume if piping is enabled, it's also based on a filter, so we use the skip rule's filter.
-        if trigger_col != '-- Select Variable --':
-            syntax.append(f"**************************************SQ Filter Flag for Skip/Piping: {filter_flag}")
-            syntax.append(f"IF({trigger_col} = {trigger_val}) {filter_flag}=1.")
-            syntax.append(f"EXECUTE.\n")
-            generated_flags.append(filter_flag)
+        # We always generate the filter flag using the base name
+        syntax.append(f"**************************************SQ Filter Flag for Skip/Piping: {filter_flag}")
+        syntax.append(f"COMMENT Filter for {target_clean}: {trigger_col} = {trigger_val}.")
+        syntax.append(f"IF({trigger_col} = {trigger_val}) {filter_flag}=1.")
+        syntax.append(f"EXECUTE.\n")
+        generated_flags.append(filter_flag)
         
         # B. Piping/Reverse Condition Check (Requires Filter Flag to be present)
         if rule['run_piping_check']:
@@ -200,7 +207,7 @@ def generate_sq_spss_syntax(rule):
             generated_flags.extend(pipe_flags)
         
         # C. Standard Skip Logic (EoO/EoC) - Only if Piping is NOT run on this specific variable
-        # If piping is run, the piping logic handles EOO/EOC for the whole question (using 1/2 flags on the variable itself).
+        # If piping is run, the piping logic handles EOO/EOC for the sub-question.
         elif rule['run_skip']:
             # Use the refined skip logic function which creates the xxSL_Qx flag for standard skips.
             sl_syntax, sl_flags = generate_skip_spss_syntax(
@@ -263,7 +270,7 @@ def generate_mq_spss_syntax(rule):
          generated_flags.extend(other_flags)
 
     # 5. Skip Logic (EoO/EoC) - uses the first variable as proxy
-    if rule['run_skip']:
+    if rule['run_skip'] and rule['trigger_col'] != '-- Select Variable --':
         target_col = cols[0] # Use the first variable as proxy for the EOC check
         sl_syntax, sl_flags = generate_skip_spss_syntax(
             target_col, rule['trigger_col'], rule['trigger_val'], 'MQ'
@@ -307,7 +314,7 @@ def generate_ranking_spss_syntax(rule):
     generated_flags.append(flag_range_name)
     
     # 3. Skip Logic (EoO/EoC) - uses the first variable as proxy
-    if rule['run_skip']:
+    if rule['run_skip'] and rule['trigger_col'] != '-- Select Variable --':
         target_col = cols[0]
         sl_syntax, sl_flags = generate_skip_spss_syntax(
             target_col, rule['trigger_col'], rule['trigger_val'], 'Ranking'
@@ -341,7 +348,7 @@ def generate_string_spss_syntax(rule):
     generated_flags.append(flag_junk)
     
     # 3. Skip Logic (EoO/EoC) - Uses the exact logic from the user's OE example
-    if rule['run_skip']:
+    if rule['run_skip'] and rule['trigger_col'] != '-- Select Variable --':
         # For string, the flag logic is different, using the variable itself as the flag 
         # (Flag_Qx is the filter, xxQx=1 is EOO, xxQx=2 is EOC)
         sl_syntax, sl_flags = generate_skip_spss_syntax(
@@ -413,8 +420,7 @@ def generate_master_spss_syntax(sq_rules, mq_rules, ranking_rules, string_rules)
             sps_content.append(f"RECODE {'; '.join(init_flags_sl)} (ELSE=0).") 
         # Initialize Filter flags to MISSING (as they are only set to 1)
         if intermediate_flags:
-            # We must use IF NOT MISS() and RECODE or just set to sysmis if they are only 1
-            # Safer to initialize to 0 for a clean start if logic only sets to 1.
+            # We use 0 as the initial value, which means "Filter Not Met" or "Not Processed"
             sps_content.append(f"RECODE {'; '.join(intermediate_flags)} (ELSE=0).") 
             
     sps_content.append("EXECUTE.\n")
@@ -440,7 +446,7 @@ def generate_master_spss_syntax(sq_rules, mq_rules, ranking_rules, string_rules)
             sps_content.append(f"VALUE LABELS {flag} 0 'Pass' 1 'Fail: Data Check'.")
         # Filter flags
         elif flag.startswith('Flag_'):
-             sps_content.append(f"VALUE LABELS {flag} 0 'Pass/Missing' 1 'Filter Flag (Intermediate)'.") 
+             sps_content.append(f"VALUE LABELS {flag} 0 'Pass/Filter Not Met' 1 'Filter Flag Met (Intermediate)'.") 
             
     sps_content.append("EXECUTE.\n")
 
@@ -483,7 +489,7 @@ def generate_master_spss_syntax(sq_rules, mq_rules, ranking_rules, string_rules)
     return "\n".join(sps_content)
 
 
-# --- UI Utility Functions ---
+# --- UI Utility Functions (unchanged) ---
 
 def clear_all_rules():
     st.session_state.sq_rules = []
@@ -547,7 +553,7 @@ def display_rules(rules, columns, header, rule_type):
                  
         st.markdown("---")
 
-# --- Rule Configuration UIs (New Variable-Centric Model) ---
+# --- Rule Configuration UIs (Updated) ---
 
 def configure_sq_rules(all_variable_options):
     """Handles batch selection and sequential configuration of SQ rules."""
@@ -608,7 +614,7 @@ def configure_sq_rules(all_variable_options):
                     other_stub_val = st.number_input("Stub Value for 'Other' (e.g., 99)", min_value=1, value=other_stub_default, key=f'{key_prefix}_other_stub')
                     
                 # --- C. Skip Logic (EoO/EoC) ---
-                st.markdown("#### C. Standard Skip Logic (EoO/EoC)")
+                st.markdown("#### C. Skip Logic Filter Condition (EoO/EoC Check)")
                 run_skip_default = existing_rule.get('run_skip', False)
                 run_skip = st.checkbox("Enable Standard Skip Logic Check (Creates Flag_Qx and xxSL_Qx)", value=run_skip_default, key=f'{key_prefix}_run_skip')
                 
@@ -616,13 +622,15 @@ def configure_sq_rules(all_variable_options):
                 skip_trigger_val_default = existing_rule.get('trigger_val') or '1'
                 
                 if run_skip:
-                    col_t_col, col_t_val = st.columns(2)
-                    with col_t_col:
-                        skip_trigger_col = st.selectbox("Trigger Question (Q_Prev)", all_variable_options, 
-                                                        index=all_variable_options.index(skip_trigger_col_default) if skip_trigger_col_default in all_variable_options else 0, 
-                                                        key=f'{key_prefix}_t_col')
-                    with col_t_val:
-                        skip_trigger_val = st.text_input("Trigger Value (e.g., '1')", value=skip_trigger_val_default, key=f'{key_prefix}_t_val')
+                    with st.container(border=True):
+                        st.info(f"Define the condition that means **{col}** should have been answered (e.g., Q1=2).")
+                        col_t_col, col_t_val = st.columns(2)
+                        with col_t_col:
+                            skip_trigger_col = st.selectbox("Filter/Trigger Variable (e.g., Q1)", all_variable_options, 
+                                                            index=all_variable_options.index(skip_trigger_col_default) if skip_trigger_col_default in all_variable_options else 0, 
+                                                            key=f'{key_prefix}_t_col')
+                        with col_t_val:
+                            skip_trigger_val = st.text_input("Filter Condition Value (e.g., 2)", value=skip_trigger_val_default, key=f'{key_prefix}_t_val')
                 else:
                     skip_trigger_col = '-- Select Variable --'
                     skip_trigger_val = '1'
@@ -636,21 +644,18 @@ def configure_sq_rules(all_variable_options):
                 pipe_stub_val_default = existing_rule.get('piping_stub_val', 1) 
 
                 if run_piping:
-                    st.warning("Piping check will automatically apply EOO/EOC logic to this variable (`xxQx_i=1/2`), overriding the standard skip logic flag (`xxSL_Qx`). A filter flag (`Flag_Qx_BASE`) is required.")
-                    col_p_source, col_p_stub = st.columns(2)
-                    with col_p_source:
-                        pipe_source_col = st.selectbox("Piping Source Column (Q_Source)", all_variable_options, 
-                                                       index=all_variable_options.index(pipe_source_col_default) if pipe_source_col_default in all_variable_options else 0, 
-                                                       key=f'{key_prefix}_p_source')
-                    with col_p_stub:
-                        # Attempt to auto-detect the stub value from Qx_i name, e.g., Q12_3 -> 3
-                        auto_val = int(col.split('_')[-1]) if '_' in col and col.split('_')[-1].isdigit() else 1
-                        pipe_stub_val = st.number_input(f"Expected Stub Value (Value of {col} must match this if {pipe_source_col} selected)", min_value=1, value=pipe_stub_val_default if existing_rule.get('piping_stub_val') else auto_val, key=f'{key_prefix}_p_stub')
+                    with st.container(border=True):
+                        st.warning("Piping check will automatically apply EOO/EOC logic to this variable (`xxQx_i=1/2`), overriding the standard skip logic flag (`xxSL_Qx`). A filter flag (`Flag_Qx_BASE`) is required (from Section C).")
+                        col_p_source, col_p_stub = st.columns(2)
+                        with col_p_source:
+                            pipe_source_col = st.selectbox("Piping Source Column (Q_Source)", all_variable_options, 
+                                                           index=all_variable_options.index(pipe_source_col_default) if pipe_source_col_default in all_variable_options else 0, 
+                                                           key=f'{key_prefix}_p_source')
+                        with col_p_stub:
+                            # Attempt to auto-detect the stub value from Qx_i name, e.g., Q12_3 -> 3
+                            auto_val = int(col.split('_')[-1]) if '_' in col and col.split('_')[-1].isdigit() else 1
+                            pipe_stub_val = st.number_input(f"Expected Stub Value (Value of {col} must match this if {pipe_source_col} selected)", min_value=1, value=pipe_stub_val_default if existing_rule.get('piping_stub_val') else auto_val, key=f'{key_prefix}_p_stub')
                     
-                    # If Piping is enabled, force the standard skip logic rule to be active to ensure the filter flag is created
-                    if not run_skip:
-                        st.info(f"Piping check for **{col}** requires a filter. Please configure Section C (Standard Skip Logic) above to define the filter trigger (e.g., Q10=1).")
-                        
                 else:
                     pipe_source_col = '-- Select Variable --'
                     pipe_stub_val = 1
@@ -684,14 +689,6 @@ def configure_sq_rules(all_variable_options):
                 
                 # Add new rules
                 for rule in new_sq_rules:
-                    # If Piping is run, we must ensure the Filter Flag logic is present, even if 'run_skip' wasn't explicitly checked.
-                    if rule['run_piping_check'] and rule['trigger_col'] != '-- Select Variable --':
-                        # The base question (e.g., Q12) needs a rule to generate Flag_Q12.
-                        # We use the first variable in the piping set to define the overall skip filter, 
-                        # so the simplest way is to ensure a rule for the base column exists with the filter.
-                        # For simplicity here, we just add the configured rule for the sub-question.
-                        pass 
-                    
                     # Overwrite existing or append new
                     existing_vars_to_keep.append(rule)
                     
@@ -741,16 +738,18 @@ def configure_mq_rules(all_variable_options):
                      other_stub_val = st.number_input("Stub Value for 'Other' (Usually 1)", min_value=1, value=1, key=f'mq_other_stub_{mq_set_name}')
 
                 # D. Skip Logic
-                st.markdown("#### D. Standard Skip Logic (EoO/EoC)")
+                st.markdown("#### D. Skip Logic Filter Condition (EoO/EoC Check)")
                 run_skip = st.checkbox(f"Enable Skip Logic Check (Uses {mq_cols[0]} as proxy)", key=f'mq_run_skip_{mq_set_name}')
                 skip_trigger_col = '-- Select Variable --'
                 skip_trigger_val = '1'
                 if run_skip:
-                    col_t_col, col_t_val = st.columns(2)
-                    with col_t_col:
-                        skip_trigger_col = st.selectbox("Trigger Question (Q_Prev)", all_variable_options, index=0, key=f'mq_t_col_{mq_set_name}')
-                    with col_t_val:
-                        skip_trigger_val = st.text_input("Trigger Value (e.g., '1')", value='1', key=f'mq_t_val_{mq_set_name}')
+                    with st.container(border=True):
+                        st.info(f"Define the condition that means **{mq_set_name}** should have been answered (e.g., Q_Prev=1).")
+                        col_t_col, col_t_val = st.columns(2)
+                        with col_t_col:
+                            skip_trigger_col = st.selectbox("Filter/Trigger Variable (e.g., Q_Prev)", all_variable_options, index=0, key=f'mq_t_col_{mq_set_name}')
+                        with col_t_val:
+                            skip_trigger_val = st.text_input("Filter Condition Value (e.g., 1)", value='1', key=f'mq_t_val_{mq_set_name}')
 
                 if st.form_submit_button("✅ Save MQ Group Rule"):
                     if mq_cols:
@@ -804,7 +803,7 @@ def configure_string_rules(all_variable_options):
                 min_length = st.number_input("Minimum Non-Junk Length (e.g., 5 characters) - Flags if answered but too short", min_value=1, value=existing_rule.get('min_length', 5), key=f'{key_prefix}_min_len')
                 
                 # B. Skip Logic (EoO/EoC)
-                st.markdown("#### B. Standard Skip Logic (EoO/EoC)")
+                st.markdown("#### B. Skip Logic Filter Condition (EoO/EoC Check)")
                 run_skip_default = existing_rule.get('run_skip', False)
                 run_skip = st.checkbox("Enable Standard Skip Logic Check (Creates Flag_Qx and xxQx=1/2)", value=run_skip_default, key=f'{key_prefix}_run_skip')
                 
@@ -812,13 +811,15 @@ def configure_string_rules(all_variable_options):
                 skip_trigger_val_default = existing_rule.get('trigger_val') or '1'
                 
                 if run_skip:
-                    col_t_col, col_t_val = st.columns(2)
-                    with col_t_col:
-                        skip_trigger_col = st.selectbox("Trigger Question (Q_Prev)", all_variable_options, 
-                                                        index=all_variable_options.index(skip_trigger_col_default) if skip_trigger_col_default in all_variable_options else 0, 
-                                                        key=f'{key_prefix}_t_col')
-                    with col_t_val:
-                        skip_trigger_val = st.text_input("Trigger Value (e.g., '1')", value=skip_trigger_val_default, key=f'{key_prefix}_t_val')
+                    with st.container(border=True):
+                        st.info(f"Define the condition that means **{col}** should have been answered (e.g., Q1=2).")
+                        col_t_col, col_t_val = st.columns(2)
+                        with col_t_col:
+                            skip_trigger_col = st.selectbox("Filter/Trigger Variable (e.g., Q1)", all_variable_options, 
+                                                            index=all_variable_options.index(skip_trigger_col_default) if skip_trigger_col_default in all_variable_options else 0, 
+                                                            key=f'{key_prefix}_t_col')
+                        with col_t_val:
+                            skip_trigger_val = st.text_input("Filter Condition Value (e.g., 2)", value=skip_trigger_val_default, key=f'{key_prefix}_t_val')
                 else:
                     skip_trigger_col = '-- Select Variable --'
                     skip_trigger_val = '1'
