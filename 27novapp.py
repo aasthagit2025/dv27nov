@@ -3,7 +3,7 @@ import pandas as pd
 import numpy as np
 import io
 import time 
-import os # Added for file extension check
+import os 
 
 # --- Configuration ---
 FLAG_PREFIX = "xx" 
@@ -21,10 +21,12 @@ if 'ranking_rules' not in st.session_state:
     st.session_state.ranking_rules = []
 if 'string_rules' not in st.session_state:
     st.session_state.string_rules = []
+if 'straightliner_rules' not in st.session_state: # NEW: Straightliner Rules
+    st.session_state.straightliner_rules = []
 if 'all_cols' not in st.session_state:
     st.session_state.all_cols = []
     
-# --- NEW DATA LOADING FUNCTION ---
+# --- DATA LOADING FUNCTION ---
 def load_data_file(uploaded_file):
     """Reads data from CSV or Excel files, handling different formats and CSV encoding."""
     
@@ -57,19 +59,12 @@ def load_data_file(uploaded_file):
 
 
 # --- CORE UTILITY FUNCTIONS (SYNTAX GENERATION) ---
-# (Functions generate_skip_spss_syntax, generate_other_specify_spss_syntax, 
-# generate_piping_spss_syntax, generate_sq_spss_syntax, configure_sq_rules, 
-# generate_mq_spss_syntax, configure_mq_rules, generate_string_spss_syntax,
-# configure_string_rules, generate_ranking_spss_syntax, generate_master_spss_syntax,
-# clear_all_rules, delete_rule, display_rules remain unchanged)
-
-# NOTE: The rest of the functions from the previous version are assumed to be here.
-# For the sake of providing the complete working code, I will include the full, verified functions again.
 
 def generate_skip_spss_syntax(target_col, trigger_col, trigger_val, rule_type, range_min=None, range_max=None):
     """
     Generates detailed SPSS syntax for Skip Logic (Error of Omission/Commission)
     using the two-stage process: Flag_Qx (intermediate filter) -> xxQx (final EoO/EoC flag).
+    *FIXED: Replaced COMMENT with * for better SPSS compatibility.*
     """
     if '_' in target_col:
         target_clean = target_col.split('_')[0]
@@ -83,16 +78,20 @@ def generate_skip_spss_syntax(target_col, trigger_col, trigger_val, rule_type, r
     
     # Stage 1: Filter Flag (Flag_Qx)
     syntax.append(f"**************************************SKIP LOGIC FILTER FLAG: {trigger_col}={trigger_val} -> {target_clean}")
-    syntax.append(f"COMMENT Qx should ONLY be asked if {trigger_col} = {trigger_val}.")
+    syntax.append(f"* Qx should ONLY be asked if {trigger_col} = {trigger_val}.")
     syntax.append(f"IF({trigger_col} = {trigger_val}) {filter_flag}=1.")
     syntax.append(f"EXECUTE.\n") 
     
     if rule_type == 'SQ' and range_min is not None and range_max is not None:
+        # EoO: Trigger met AND (Missing OR Out-of-Range)
         eoo_condition = f"(miss({target_col}) | ~range({target_col},{range_min},{range_max}))"
+        # EoC: Trigger NOT met AND (Answered)
         eoc_condition = f"~miss({target_col})" 
         
     elif rule_type == 'String':
+        # EoO: Trigger met AND (Missing OR Empty String)
         eoo_condition = f"({target_col}='' | miss({target_col}))"
+        # EoC: Trigger NOT met AND (Not Missing AND Not Empty)
         eoc_condition = f"({target_col}<>'' & ~miss({target_col}))" 
         
     else: # MQ/Ranking/General
@@ -102,12 +101,12 @@ def generate_skip_spss_syntax(target_col, trigger_col, trigger_val, rule_type, r
     # --- EoO/EoC Logic ---
     syntax.append(f"**************************************SKIP LOGIC EoO/EoC CHECK: {target_col} -> {final_error_flag}")
     
-    # Error of Omission (EoO) - Flag=1: Trigger Met (Flag_Qx=1), Target Fails Check (EoO condition)
-    syntax.append(f"COMMENT EoO (1): Trigger Met ({filter_flag}=1), Target Fails Check/Missing/Out-of-Range/Empty.")
+    # Error of Omission (EoO) - Flag=1
+    syntax.append(f"* EoO (1): Trigger Met ({filter_flag}=1), Target Fails Check/Missing/Out-of-Range/Empty.")
     syntax.append(f"IF({filter_flag} = 1 & {eoo_condition}) {final_error_flag}=1.")
     
-    # Error of Commission (EoC) - Flag=2: Trigger NOT Met AND Target Answered (EoC condition)
-    syntax.append(f"COMMENT EoC (2): Trigger Not Met ({filter_flag}<>1 | miss({filter_flag})), Target Answered.")
+    # Error of Commission (EoC) - Flag=2
+    syntax.append(f"* EoC (2): Trigger Not Met ({filter_flag}<>1 | miss({filter_flag})), Target Answered.")
     syntax.append(f"IF(({filter_flag} <> 1 | miss({filter_flag})) & {eoc_condition}) {final_error_flag}=2.")
     
     syntax.append("EXECUTE.\n")
@@ -118,6 +117,7 @@ def generate_skip_spss_syntax(target_col, trigger_col, trigger_val, rule_type, r
 def generate_other_specify_spss_syntax(main_col, other_col, other_stub_val):
     """
     Generates syntax for Other-Specify checks (Both forward and reverse conditions).
+    *FIXED: Replaced COMMENT with * for better SPSS compatibility.*
     """
     syntax = []
     if '_' in main_col:
@@ -130,13 +130,13 @@ def generate_other_specify_spss_syntax(main_col, other_col, other_stub_val):
     
     # Forward Check (Main selected, Other is empty/missing) - EoO type check
     syntax.append(f"**************************************OTHER SPECIFY (Forward) Check: {main_col}={other_stub_val} AND {other_col} is missing/blank")
-    syntax.append(f"COMMENT EoO (1): Main selected ({main_col}={other_stub_val}), Other is missing/blank.")
+    syntax.append(f"* EoO (1): Main selected ({main_col}={other_stub_val}), Other is missing/blank.")
     syntax.append(f"IF({main_col}={other_stub_val} & ({other_col}='' | miss({other_col}))) {flag_name_fwd}=1.")
     syntax.append(f"EXECUTE.\n")
     
     # Reverse Check (Other answered, Main not selected) - EoC type check
     syntax.append(f"**************************************OTHER SPECIFY (Reverse) Check: {other_col} has data AND {main_col}<>{other_stub_val}")
-    syntax.append(f"COMMENT EoC (2): Other has data (~miss({other_col}) & {other_col}<>''), Main not selected.")
+    syntax.append(f"* EoC (2): Other has data (~miss({other_col}) & {other_col}<>''), Main not selected.")
     syntax.append(f"IF(~miss({other_col}) & {other_col}<>'' & {main_col}<>{other_stub_val}) {flag_name_rev}=1.")
     syntax.append(f"EXECUTE.\n")
     
@@ -144,21 +144,21 @@ def generate_other_specify_spss_syntax(main_col, other_col, other_stub_val):
 
 def generate_piping_spss_syntax(target_col, overall_skip_filter_flag, piping_source_col, piping_stub_val):
     """
-    Generates syntax for the Rating Piping/Reverse Condition check (Qx_i must equal i if Q_source=i),
-    integrated with the overall Skip Filter Flag (Flag_Qx).
+    Generates syntax for the Rating Piping/Reverse Condition check.
+    *FIXED: Replaced COMMENT with * for better SPSS compatibility.*
     """
     syntax = []
     
-    flag_col = f"{FLAG_PREFIX}{target_col}" # Use the target variable itself as the flag (1=EOO, 2=EOC)
+    flag_col = f"{FLAG_PREFIX}{target_col}" 
     
     # 1. Error of Omission (EOO) - Target is missing/wrong when piping condition is met
     syntax.append(f"**************************************PIPING (EOO) Check: (Filter={overall_skip_filter_flag}=1) AND ({piping_source_col}={piping_stub_val}) AND {target_col}<>{piping_stub_val}")
-    syntax.append(f"COMMENT EoO (1): Piping/Skip met, Target value is wrong/missing. IF(((Flag_Q12=1) & Q11=1 ) & Q12_1<>1)xxQ12_1=1.")
+    syntax.append(f"* EoO (1): Piping/Skip met, Target value is wrong/missing. IF(((Flag_Q12=1) & Q11=1 ) & Q12_1<>1)xxQ12_1=1.")
     syntax.append(f"IF(({overall_skip_filter_flag}=1) & ({piping_source_col}={piping_stub_val}) & {target_col}<>{piping_stub_val}) {flag_col}=1.")
     
     # 2. Error of Commission (EOC / Reverse Condition) - Target has data when piping condition is NOT met
     syntax.append(f"**************************************PIPING (EOC / Reverse) Check: (Filter NOT met OR Piping NOT met) AND {target_col} is answered")
-    syntax.append(f"COMMENT EoC (2): Skip/Piping not met, Target value is wrongly answered. IF((Flag_Q12<>1 | miss(Flag_Q12) | Q11<>1 | miss(Q11)) & ~miss(Q12_1))xxQ12_1=2.")
+    syntax.append(f"* EoC (2): Skip/Piping not met, Target value is wrongly answered. IF((Flag_Q12<>1 | miss(Flag_Q12) | Q11<>1 | miss(Q11)) & ~miss(Q12_1))xxQ12_1=2.")
     
     # EOC Condition: (Flag_Qx<>1 OR miss(Flag_Qx) OR Q_source<>i OR miss(Q_source)) AND ~miss(Target)
     eoc_condition = f"({overall_skip_filter_flag}<>1 | miss({overall_skip_filter_flag}) | {piping_source_col}<>{piping_stub_val} | miss({piping_source_col})) & ~miss({target_col})"
@@ -216,7 +216,7 @@ def generate_sq_spss_syntax(rule):
         
         # B. Generate Filter Flag (Flag_Qx)
         syntax.append(f"**************************************SQ Filter Flag for Skip/Piping: {filter_flag}")
-        syntax.append(f"COMMENT Filter for {target_clean}: {trigger_col} = {trigger_val}.")
+        syntax.append(f"* Filter for {target_clean}: {trigger_col} = {trigger_val}.")
         syntax.append(f"IF({trigger_col} = {trigger_val}) {filter_flag}=1.")
         syntax.append(f"EXECUTE.\n")
         generated_flags.append(filter_flag)
@@ -260,7 +260,7 @@ def configure_sq_rules(all_variable_options):
             new_sq_rules = []
             
             for i, col in enumerate(st.session_state.sq_batch_vars):
-                st.markdown(f"###⚙️ Rule Configuration for **{col}** (Variable {i+1}/{len(st.session_state.sq_batch_vars)})")
+                st.markdown(f"### ⚙️ Rule Configuration for **{col}** (Variable {i+1}/{len(st.session_state.sq_batch_vars)})")
                 
                 existing_rule = next((r for r in st.session_state.sq_rules if r['variable'] == col), {})
                 
@@ -378,6 +378,66 @@ def configure_sq_rules(all_variable_options):
             else:
                 st.markdown("Submit the form above to save the configured rules.")
 
+# NEW FUNCTION: Generate Straightliner Syntax
+def generate_straightliner_spss_syntax(cols):
+    """
+    Generates SPSS syntax for a Maximum Straightliner check (MIN=MAX).
+    This flags respondents who gave the exact same answer for all items in the grid.
+    """
+    cols_str = ' '.join(cols)
+    set_name = cols[0].split('_')[0] if cols else 'Rating_Set'
+    flag_name_max_str = f"{FLAG_PREFIX}{set_name}_MaxStr"
+    
+    syntax = []
+    
+    syntax.append(f"**************************************STRAIGHTLINER CHECK: {set_name} (Max: All Items Same Value)")
+    syntax.append(f"* Check if the minimum value equals the maximum value across the grid items for a single respondent.")
+    
+    # Calculate MIN and MAX for the row/case
+    syntax.append(f"COMPUTE #Min_Val = MIN({cols_str}).")
+    syntax.append(f"COMPUTE #Max_Val = MAX({cols_str}).")
+    
+    # Flag 1 if MIN = MAX AND at least one item is answered (to ignore fully missing cases)
+    syntax.append(f"IF(#Min_Val = #Max_Val & ~miss({cols[0]})) {flag_name_max_str}=1.")
+    syntax.append(f"EXECUTE.\n")
+    
+    # Clean up temporary variables
+    syntax.append(f"DELETE VARIABLES #Min_Val #Max_Val.")
+    syntax.append(f"EXECUTE.\n")
+
+    return syntax, [flag_name_max_str]
+
+# NEW FUNCTION: Configure Straightliner Rules
+def configure_straightliner_rules():
+    """Handles the configuration of Straightliner checks for rating grids."""
+    st.subheader("2. Straightliner Check (Rating Grids) Configuration")
+    
+    with st.expander("➕ Add Straightliner Group Rule", expanded=False):
+        straightliner_cols = st.multiselect("Select ALL Variables in the Rating Grid (Qx_1, Qx_2, ...)", st.session_state.all_cols, 
+                                 key='straightliner_cols_select')
+        
+        if straightliner_cols:
+            group_name = straightliner_cols[0].split('_')[0]
+            
+            with st.form(f"straightliner_form_{group_name}"):
+                st.markdown(f"### ⚙️ Rule Configuration for Grid: **{group_name}**")
+                
+                # Straightlining is generally a 'Max' check (all same answer) for simplicity in SPSS.
+                st.info(f"The rule will check if all items in the group **{group_name}** have the same value (e.g., all 5s) and flag it as `xx{group_name}_MaxStr=1`.")
+                
+                if st.form_submit_button("✅ Save Straightliner Group Rule"):
+                    if len(straightliner_cols) > 1:
+                        st.session_state.straightliner_rules.append({
+                            'variables': straightliner_cols,
+                            'group_name': group_name,
+                        })
+                        st.success(f"Straightliner Rule added for group **{group_name}**.")
+                        st.rerun()
+                    else:
+                        st.warning("Please select at least two columns for the Straightliner check.")
+
+
+# MQ functions remain here...
 def generate_mq_spss_syntax(rule):
     """Generates detailed SPSS syntax for a Multi-Select check."""
     cols = rule['variables']
@@ -439,8 +499,8 @@ def generate_mq_spss_syntax(rule):
     return syntax, generated_flags
 
 def configure_mq_rules(all_variable_options):
-    """Handles batch selection and sequential configuration of MQ rules (currently one rule per group)."""
-    st.subheader("2. Multi-Select Rule (MQ) Configuration")
+    """Handles configuration of MQ rules."""
+    st.subheader("3. Multi-Select Rule (MQ) Configuration")
     
     with st.expander("➕ Add Multi-Select Group Rule", expanded=False):
         mq_cols = st.multiselect("Select ALL Multi-Select Variables in the Group (Qx_1, Qx_2, ...)", st.session_state.all_cols, 
@@ -487,7 +547,7 @@ def configure_mq_rules(all_variable_options):
                 
                 if run_skip:
                     with st.container(border=True):
-                        st.info(f"Define the condition that means **{mq_set_name}** should have been answered (e.g., Q_Prev=1).")
+                        st.info(f"*Define the condition that means **{mq_set_name}** should have been answered (e.g., Q_Prev=1).")
                         col_t_col, col_t_val = st.columns(2)
                         with col_t_col:
                             skip_trigger_col = st.selectbox("**Filter/Trigger Variable** (e.g., Q0)", all_variable_options, 
@@ -519,9 +579,48 @@ def configure_mq_rules(all_variable_options):
                     else:
                         st.warning("Please select columns for the MQ group.")
 
+def generate_string_spss_syntax(rule):
+    """
+    Generates detailed SPSS syntax for a String check.
+    *UPDATED: Added explicit Missing Check if skip is disabled. Updated comments/flag names.*
+    """
+    col = rule['variable']
+    min_length = rule['min_length']
+    
+    syntax = []
+    generated_flags = []
+
+    # 1. Junk/Min Length Check 
+    if min_length and min_length > 0:
+        flag_length = f"{FLAG_PREFIX}{col}_Junk"
+        syntax.append(f"**************************************String Junk Check: {col} (Min Length: {min_length} chars)")
+        # Flag 1 if answered (not miss or '') AND length < min_length
+        syntax.append(f"IF(~miss({col}) & {col}<>'' & LENGTH(RTRIM({col})) < {min_length}) {flag_length}=1.")
+        syntax.append(f"EXECUTE.\n")
+        generated_flags.append(flag_length)
+    
+    # 2. Explicit Missing Check (Only run if NO skip logic is enabled)
+    if not rule['run_skip']:
+        flag_missing = f"{FLAG_PREFIX}{col}_Miss"
+        syntax.append(f"**************************************String Missing Check: {col} (Missing Mandatory Check)")
+        # Flag 1 if missing or empty string
+        syntax.append(f"IF({col}='' | miss({col})) {flag_missing}=1.")
+        syntax.append(f"EXECUTE.\n")
+        generated_flags.append(flag_missing)
+        
+    # 3. Skip Logic (EoO/EoC) 
+    if rule['run_skip'] and rule['trigger_col'] != '-- Select Variable --':
+        sl_syntax, sl_flags = generate_skip_spss_syntax(
+            col, rule['trigger_col'], rule['trigger_val'], 'String'
+        )
+        syntax.extend(sl_syntax)
+        generated_flags.extend(sl_flags)
+        
+    return syntax, generated_flags
+
 def configure_string_rules(all_variable_options):
     """Handles batch selection and sequential configuration of String rules."""
-    st.subheader("3. String/Open-End Rule Configuration")
+    st.subheader("4. String/Open-End Rule Configuration")
     
     string_cols = st.multiselect("Select ALL Target Variables (Qx_OE/TEXT) for String/Open-End", st.session_state.all_cols, 
                              key='string_batch_select_key',
@@ -533,7 +632,7 @@ def configure_string_rules(all_variable_options):
     st.markdown("---")
     
     if st.session_state.get('string_batch_vars'):
-        st.info(f"Configuring **{len(st.session_state.string_batch_vars)}** selected String variables one-by-one below. (Note: String skip logic uses `xxQx=1/2` flag.)")
+        st.info(f"Configuring **{len(st.session_state.string_batch_vars)}** selected String variables one-by-one below. (Note: **Range check is not required** for string variables.)")
         
         string_config_form_key = 'string_config_form'
         with st.form(string_config_form_key):
@@ -544,22 +643,23 @@ def configure_string_rules(all_variable_options):
                 key_prefix = f'string_{col}_{i}'
                 existing_rule = next((r for r in st.session_state.string_rules if r['variable'] == col), {})
                 
-                # A. Length Check
-                st.markdown("#### A. Length & Missing Check")
-                min_length = st.number_input("Minimum Non-Junk Length (e.g., 5 characters) - Flags if answered but too short", min_value=1, value=existing_rule.get('min_length', 5), key=f'{key_prefix}_min_len')
+                # A. Junk Check
+                st.markdown("#### A. Junk Answer Check (Minimum Length)")
+                min_length = st.number_input("Minimum Non-Junk Length (e.g., 5 characters) - Answers shorter than this are flagged, if answered.", min_value=1, value=existing_rule.get('min_length', 5), key=f'{key_prefix}_min_len')
                 
                 # B. Skip Logic (EoO/EoC)
-                st.markdown("#### B. Skip Logic Filter Condition (EoO/EoC Check)")
+                st.markdown("#### B. Skip Logic Filter Condition (Also handles conditional Missing Check)")
+                
                 run_skip_default = existing_rule.get('run_skip', False)
                 
                 skip_trigger_col_default = existing_rule.get('trigger_col') or '-- Select Variable --'
                 skip_trigger_val_default = existing_rule.get('trigger_val') or '1'
                 
-                run_skip = st.checkbox("Enable Standard Skip Logic Check (Creates Flag_Qx and xxQx=1/2)", value=run_skip_default, key=f'{key_prefix}_run_skip')
+                run_skip = st.checkbox("Enable Conditional Skip Logic Check (Creates Flag_Qx and xxQx=1/2)", value=run_skip_default, key=f'{key_prefix}_run_skip')
                 
                 if run_skip:
                     with st.container(border=True):
-                        st.info(f"Define the condition that means **{col}** should have been answered (e.g., Q_Prev=2).")
+                        st.info(f"*Define the condition that means **{col}** should have been answered (EoO Check).")
                         col_t_col, col_t_val = st.columns(2)
                         with col_t_col:
                             skip_trigger_col = st.selectbox("**Filter/Trigger Variable** (e.g., Q0)", all_variable_options, 
@@ -568,6 +668,7 @@ def configure_string_rules(all_variable_options):
                         with col_t_val:
                             skip_trigger_val = st.text_input("**Filter Condition Value** (e.g., 2)", value=skip_trigger_val_default, key=f'{key_prefix}_t_val')
                 else:
+                    st.info("No skip logic enabled. An explicit **Mandatory Missing Check** (`xxQx_Miss`) will be generated instead.")
                     skip_trigger_col = '-- Select Variable --'
                     skip_trigger_val = '1'
 
@@ -596,6 +697,7 @@ def configure_string_rules(all_variable_options):
             else:
                 st.markdown("Submit the form above to save the configured rules.")
 
+# Ranking functions remain here...
 def generate_ranking_spss_syntax(rule):
     """Generates detailed SPSS syntax for a Ranking check."""
     cols = rule['variables']
@@ -638,7 +740,7 @@ def generate_ranking_spss_syntax(rule):
         
     return syntax, generated_flags
 
-def generate_master_spss_syntax(sq_rules, mq_rules, ranking_rules, string_rules):
+def generate_master_spss_syntax(sq_rules, mq_rules, ranking_rules, string_rules, straightliner_rules):
     """Generates the final .sps file by iterating over all stored rules."""
     all_syntax_blocks = []
     all_flag_cols = []
@@ -659,6 +761,11 @@ def generate_master_spss_syntax(sq_rules, mq_rules, ranking_rules, string_rules)
         all_syntax_blocks.append(syntax)
         all_flag_cols.extend(flags)
 
+    for rule in straightliner_rules: # NEW: Straightliner Rules
+        syntax, flags = generate_straightliner_spss_syntax(rule['variables'])
+        all_syntax_blocks.append(syntax)
+        all_flag_cols.extend(flags)
+
     for rule in string_rules:
         syntax, flags = generate_string_spss_syntax(rule)
         all_syntax_blocks.append(syntax)
@@ -675,19 +782,31 @@ def generate_master_spss_syntax(sq_rules, mq_rules, ranking_rules, string_rules)
     
     unique_flag_names = sorted(list(set(all_flag_cols)))
     
-    init_flags_0 = [f for f in unique_flag_names if f.startswith(FLAG_PREFIX) and not f.endswith('_Count')]
+    # Filter for flags that need initialization (excluding counts/temp vars)
+    init_flags_0 = [f for f in unique_flag_names if f.startswith(FLAG_PREFIX) and not f.endswith(('_Count', '_Miss', '_Junk'))]
     intermediate_flags = [f for f in unique_flag_names if f.startswith('Flag_')]
     
     all_numeric_flags = init_flags_0 + intermediate_flags
     
+    # String flags (which are numeric but may not have been in the original init_flags_0 list)
+    string_flags = [f for f in unique_flag_names if f.endswith(('_Miss', '_Junk'))]
+    all_numeric_flags.extend(string_flags)
+    all_numeric_flags = sorted(list(set(all_numeric_flags)))
+    
     if all_numeric_flags:
         sps_content.append(f"NUMERIC {'; '.join(all_numeric_flags)}.")
         
+        # Initialize the final flags to 0
         if init_flags_0:
             sps_content.append(f"RECODE {'; '.join(init_flags_0)} (ELSE=0).") 
             
+        # Initialize intermediate flags to 0
         if intermediate_flags:
             sps_content.append(f"RECODE {'; '.join(intermediate_flags)} (ELSE=0).") 
+
+        # Initialize string flags to 0
+        if string_flags:
+            sps_content.append(f"RECODE {'; '.join(string_flags)} (ELSE=0).") 
             
     sps_content.append("EXECUTE.\n")
     
@@ -700,13 +819,16 @@ def generate_master_spss_syntax(sq_rules, mq_rules, ranking_rules, string_rules)
     
     for flag in unique_flag_names:
         
-        if flag.startswith(FLAG_PREFIX) and not flag.endswith(('_Count', '_Any', '_Rng', '_OtherFwd', '_OtherRev', '_Min', '_Max', '_Dup', '_Miss', '_Junk')):
-            sps_content.append(f"VALUE LABELS {flag} 0 'Pass' 1 'Fail: Error of Omission (EOO)' 2 'Fail: Error of Commission (EoC)'.")
-        
-        elif flag.startswith(FLAG_PREFIX) and not flag.endswith('_Count'):
+        if flag.startswith(FLAG_PREFIX) and flag.endswith(('_Rng', '_Any', '_OtherFwd', '_OtherRev', '_Min', '_Max', '_Dup', '_Miss', '_Junk', '_MaxStr')):
+            # General 'Fail: Data Check' for non-EoO/EoC flags
             sps_content.append(f"VALUE LABELS {flag} 0 'Pass' 1 'Fail: Data Check'.")
             
+        elif flag.startswith(FLAG_PREFIX) and not flag.endswith('_Count'):
+            # EoO/EoC flags (xxQx)
+            sps_content.append(f"VALUE LABELS {flag} 0 'Pass' 1 'Fail: Error of Omission (EOO)' 2 'Fail: Error of Commission (EoC)'.")
+        
         elif flag.startswith('Flag_'):
+             # Intermediate skip filter flags
              sps_content.append(f"VALUE LABELS {flag} 0 'Pass/Filter Not Met' 1 'Filter Flag Met (Intermediate)'.") 
             
     sps_content.append("EXECUTE.\n")
@@ -719,21 +841,24 @@ def generate_master_spss_syntax(sq_rules, mq_rules, ranking_rules, string_rules)
         temp_flag_logic = []
         temp_flags = []
         
+        # Only count final error flags (xx prefix, excluding calculated counts)
         error_flags_to_count = [f for f in master_error_flags if f.startswith(FLAG_PREFIX) and not f.endswith('_Count')]
         
         if error_flags_to_count:
             sps_content.append("\n*--- Temporary Binary Flags for Counting ---*")
+            
+            # Use COMPUTE / IF for temporary flags to handle the mix of 0/1 and 0/1/2 flags correctly
+            sps_content.append(f"NUMERIC {'; '.join([f'T_{f}' for f in error_flags_to_count])}.")
+            
             for flag in error_flags_to_count:
                 temp_name = f"T_{flag}"
                 temp_flag_logic.append(f"IF({flag}>0) {temp_name}=1.") 
                 temp_flag_logic.append(f"ELSE {temp_name}=0.")
-                temp_flags.append(temp_name)
             
-            sps_content.append(f"NUMERIC {'; '.join(temp_flags)}.")
             sps_content.extend(temp_flag_logic)
             sps_content.append("EXECUTE.\n")
 
-            master_flag_logic = ' + '.join(temp_flags)
+            master_flag_logic = ' + '.join([f'T_{f}' for f in error_flags_to_count])
             
             sps_content.append(f"COMPUTE Master_Reject_Count = SUM({master_flag_logic}).")
             sps_content.append("VARIABLE LABELS Master_Reject_Count 'Total Validation Errors (DV)'.")
@@ -748,13 +873,14 @@ def generate_master_spss_syntax(sq_rules, mq_rules, ranking_rules, string_rules)
     return "\n".join(sps_content)
 
 
-# --- UI Utility Functions (unchanged) ---
+# --- UI Utility Functions ---
 
 def clear_all_rules():
     st.session_state.sq_rules = []
     st.session_state.mq_rules = []
     st.session_state.ranking_rules = []
     st.session_state.string_rules = []
+    st.session_state.straightliner_rules = [] # NEW: Clear Straightliner Rules
     if 'sq_batch_vars' in st.session_state: del st.session_state.sq_batch_vars
     if 'mq_batch_vars' in st.session_state: del st.session_state.mq_batch_vars
     if 'ranking_batch_vars' in st.session_state: del st.session_state.ranking_batch_vars
@@ -771,6 +897,8 @@ def delete_rule(rule_type, index):
         del st.session_state.ranking_rules[index]
     elif rule_type == 'string':
         del st.session_state.string_rules[index]
+    elif rule_type == 'straightliner': # NEW: Delete Straightliner Rule
+        del st.session_state.straightliner_rules[index]
     st.rerun() 
 
 def display_rules(rules, columns, header, rule_type):
@@ -779,11 +907,24 @@ def display_rules(rules, columns, header, rule_type):
         
         display_data = []
         for rule in rules:
-            display_row = {'Target Var': rule.get('variable') or (rule.get('variables', ['Group']) + [''])[0]}
+            target_name = rule.get('variable') or (rule.get('variables', ['Group']) + [''])[0]
+            display_row = {'Target Var': target_name}
             
-            if 'min_val' in rule: display_row['Range'] = f"{rule['min_val']} to {rule['max_val']}"
-            if 'other_var' in rule and rule['other_var'] and rule['other_var'] != '-- Select Variable --': display_row['Other Check'] = rule['other_var']
+            if rule_type == 'sq':
+                display_row['Range'] = f"{rule['min_val']} to {rule['max_val']}"
+                if 'other_var' in rule and rule['other_var'] and rule['other_var'] != '-- Select Variable --': display_row['Other Check'] = rule['other_var']
             
+            if rule_type == 'mq':
+                display_row['Count Check'] = f"{rule['min_count']} to {rule.get('max_count', 'MAX')}"
+                if 'exclusive_col' in rule and rule['exclusive_col'] != 'None': display_row['Exclusive'] = rule['exclusive_col']
+            
+            if rule_type == 'string':
+                display_row['Junk Length'] = rule['min_length']
+            
+            if rule_type == 'straightliner':
+                display_row['Check Type'] = "Max Straightliner"
+            
+            # Skip/Piping Logic (Applies to SQ, MQ, String, Ranking)
             skip_info = ""
             if rule.get('run_skip') and rule.get('trigger_col') and rule.get('trigger_col') != '-- Select Variable --':
                  skip_info = f"Filter: {rule['trigger_col']}={rule['trigger_val']}"
@@ -795,10 +936,10 @@ def display_rules(rules, columns, header, rule_type):
                     skip_info = f"Piping: {rule['piping_source_col']}"
                     
             if skip_info: display_row['Skip/Piping Check'] = skip_info
-
-            if 'min_count' in rule: display_row['Count Check'] = f"{rule['min_count']} to {rule.get('max_count', 'MAX')}"
-            if 'exclusive_col' in rule and rule['exclusive_col'] != 'None': display_row['Exclusive'] = rule['exclusive_col']
-            if 'min_length' in rule: display_row['Min Length'] = rule['min_length']
+            
+            # Explicit Missing Check for String (if no skip is running)
+            if rule_type == 'string' and not rule.get('run_skip'):
+                 display_row['Missing Check'] = 'Mandatory'
             
             display_data.append(display_row)
             
@@ -822,14 +963,13 @@ def display_rules(rules, columns, header, rule_type):
                  
         st.markdown("---")
 
-# --- Main App Flow (UPDATED) ---
+# --- Main App Flow ---
 
-# Added the header for the first step
-st.header("Step 1: Upload Survey Data File")
+st.header("Step 1: Upload Survey Data File (CSV, SPSS, or Excel)")
 
-# Updated file uploader to accept multiple file types
+# Updated file uploader to accept multiple file types (CSV, XLSX, XLS)
 uploaded_file = st.file_uploader(
-    "Choose a Survey Data File (CSV, Excel - .xlsx/.xls)", 
+    "Choose a Survey Data File", 
     type=['csv', 'xlsx', 'xls'] 
 )
 
@@ -849,19 +989,22 @@ if uploaded_file:
         with col_side_a:
             st.sidebar.button("🗑️ Clear All Rules", on_click=clear_all_rules)
         with col_side_b:
-            total_rules = len(st.session_state.sq_rules) + len(st.session_state.mq_rules) + len(st.session_state.ranking_rules) + len(st.session_state.string_rules)
+            total_rules = len(st.session_state.sq_rules) + len(st.session_state.mq_rules) + len(st.session_state.ranking_rules) + len(st.session_state.string_rules) + len(st.session_state.straightliner_rules)
             st.sidebar.markdown(f"**Total Rules:** {total_rules}")
         
-        # Display existing rules first
-        display_rules(st.session_state.sq_rules, ['variable'], "Current Single Select (SQ) Rules", 'sq')
-        display_rules(st.session_state.mq_rules, ['variables'], "Current Multi-Select (MQ) Rules", 'mq')
+        # Display existing rules
+        display_rules(st.session_state.sq_rules, ['variable'], "Current 1. Single Select (SQ) / Rating Rules", 'sq')
+        display_rules(st.session_state.straightliner_rules, ['variables'], "Current 2. Straightliner (Grid) Rules", 'straightliner') # NEW
+        display_rules(st.session_state.mq_rules, ['variables'], "Current 3. Multi-Select (MQ) Rules", 'mq')
         # Ranking Configuration is omitted for brevity but the generator is present
         # display_rules(st.session_state.ranking_rules, ['variables'], "Current Ranking Rules", 'ranking')
-        display_rules(st.session_state.string_rules, ['variable'], "Current String/OE Rules", 'string')
+        display_rules(st.session_state.string_rules, ['variable'], "Current 4. String/OE Rules", 'string')
 
 
         # New Configuration UIs
         configure_sq_rules(all_variable_options)
+        st.markdown("---")
+        configure_straightliner_rules() # NEW
         st.markdown("---")
         configure_mq_rules(all_variable_options)
         st.markdown("---")
@@ -870,7 +1013,7 @@ if uploaded_file:
 
         st.header("Step 3: Generate Master Syntax")
         
-        total_rules = len(st.session_state.sq_rules) + len(st.session_state.mq_rules) + len(st.session_state.ranking_rules) + len(st.session_state.string_rules)
+        total_rules = len(st.session_state.sq_rules) + len(st.session_state.mq_rules) + len(st.session_state.ranking_rules) + len(st.session_state.string_rules) + len(st.session_state.straightliner_rules)
         
         if total_rules > 0:
             
@@ -879,7 +1022,8 @@ if uploaded_file:
                 st.session_state.sq_rules, 
                 st.session_state.mq_rules, 
                 st.session_state.ranking_rules, 
-                st.session_state.string_rules
+                st.session_state.string_rules,
+                st.session_state.straightliner_rules
             )
             
             st.success(f"Generated complete syntax for **{total_rules}** validation rules.")
@@ -894,67 +1038,83 @@ if uploaded_file:
                     mime="text/plain"
                 )
             
-            st.subheader("Preview of Generated Detailed SPSS Logic (Filter/Skip)")
+            st.subheader("Preview of Generated Detailed SPSS Logic (Filter/Skip/Straightliner)")
             
             preview_syntax_list = []
             
-            def get_syntax_for_preview(rule_list, generator_func, is_sq_or_string):
-                for rule in rule_list:
-                    if (rule.get('run_skip') or rule.get('run_piping_check')) and rule['trigger_col'] != '-- Select Variable --':
-                        target = rule.get('variable') or rule['variables'][0].split('_')[0]
+            def get_syntax_for_preview(rule_list, generator_func, rule_type):
+                if not rule_list: return False
+                rule = rule_list[0] # Just take the first rule for preview
+                
+                # Straightliner check (different logic)
+                if rule_type == 'straightliner':
+                     syntax, _ = generator_func(rule['variables'])
+                     preview_syntax_list.extend(syntax)
+                     return True
+                
+                # Skip Logic / Piping / Other Checks
+                if (rule.get('run_skip') or rule.get('run_piping_check')) and rule['trigger_col'] != '-- Select Variable --':
+                    target = rule.get('variable') or rule['variables'][0].split('_')[0]
+                    
+                    if rule.get('run_piping_check') and rule.get('piping_source_col') != '-- Select Variable --':
+                        target_clean = target.split('_')[0] if '_' in target else target
+                        filter_flag = f"Flag_{target_clean}"
                         
-                        if rule.get('run_piping_check') and rule.get('piping_source_col') != '-- Select Variable --':
-                            target_clean = target.split('_')[0] if '_' in target else target
-                            filter_flag = f"Flag_{target_clean}"
-                            
-                            sl_syntax = [
-                                f"**************************************SQ Filter Flag for Skip/Piping: {filter_flag}",
-                                f"COMMENT Filter for {target_clean}: {rule['trigger_col']} = {rule['trigger_val']}.",
-                                f"IF({rule['trigger_col']} = {rule['trigger_val']}) {filter_flag}=1.",
-                                f"EXECUTE.\n"
-                            ]
-                            
-                            pipe_syntax, _ = generate_piping_spss_syntax(
-                                target, filter_flag, rule['piping_source_col'], rule['piping_stub_val']
-                            )
-                            sl_syntax.extend(pipe_syntax)
+                        sl_syntax = [
+                            f"**************************************SQ Filter Flag for Skip/Piping: {filter_flag}",
+                            f"* Filter for {target_clean}: {rule['trigger_col']} = {rule['trigger_val']}.",
+                            f"IF({rule['trigger_col']} = {rule['trigger_val']}) {filter_flag}=1.",
+                            f"EXECUTE.\n"
+                        ]
                         
-                        elif rule.get('run_skip'):
-                            sl_type = 'SQ' if is_sq_or_string else 'MQ'
-                            min_val = rule.get('min_val') if is_sq_or_string else None
-                            max_val = rule.get('max_val') if is_sq_or_string else None
-                            
-                            sl_syntax, _ = generate_skip_spss_syntax(
-                                target, 
-                                rule['trigger_col'], 
-                                rule['trigger_val'], 
-                                sl_type, 
-                                min_val, 
-                                max_val
-                            )
-                        else:
-                            continue 
-
+                        pipe_syntax, _ = generate_piping_spss_syntax(
+                            target, filter_flag, rule['piping_source_col'], rule['piping_stub_val']
+                        )
+                        sl_syntax.extend(pipe_syntax)
                         preview_syntax_list.extend(sl_syntax)
-                        return True 
+                    
+                    elif rule.get('run_skip'):
+                        sl_type = 'SQ' if rule_type == 'sq' or rule_type == 'string' else 'MQ'
+                        min_val = rule.get('min_val') if rule_type == 'sq' else None
+                        max_val = rule.get('max_val') if rule_type == 'sq' else None
+                        
+                        sl_syntax, _ = generate_skip_spss_syntax(
+                            target, 
+                            rule['trigger_col'], 
+                            rule['trigger_val'], 
+                            sl_type, 
+                            min_val, 
+                            max_val
+                        )
+                        preview_syntax_list.extend(sl_syntax)
+
+                    return True
+                
+                # Explicit Missing Check (String only)
+                if rule_type == 'string' and not rule.get('run_skip'):
+                    syntax, _ = generator_func(rule)
+                    # Filter to just the missing check part
+                    missing_check_syntax = [line for line in syntax if '_Miss' in line or '*' in line]
+                    preview_syntax_list.extend(missing_check_syntax)
+                    return True
+
                 return False
 
-            # Find the first rule with skip/piping logic enabled and display its syntax
-            if get_syntax_for_preview(st.session_state.sq_rules, generate_sq_spss_syntax, True):
-                 pass 
-            elif get_syntax_for_preview(st.session_state.mq_rules, generate_mq_spss_syntax, False):
-                 pass
-            elif get_syntax_for_preview(st.session_state.string_rules, generate_string_spss_syntax, True):
-                 pass
+            # Find the first rule of any type that has a detailed logic to show
+            if not get_syntax_for_preview(st.session_state.straightliner_rules, generate_straightliner_spss_syntax, 'straightliner'):
+                if not get_syntax_for_preview(st.session_state.sq_rules, generate_sq_spss_syntax, 'sq'):
+                    if not get_syntax_for_preview(st.session_state.mq_rules, generate_mq_spss_syntax, 'mq'):
+                        get_syntax_for_preview(st.session_state.string_rules, generate_string_spss_syntax, 'string')
+
 
             if preview_syntax_list:
-                st.info("Showing preview of the correct Filter Variable/Condition structure from one of your rules:")
+                st.info("Showing preview of the detailed structure of a configured check:")
                 preview_text = '\n'.join(preview_syntax_list[:40]) 
             else:
-                st.info("No Skip/Piping Logic configured. Showing top of file.")
+                st.info("No detailed logic configured. Showing top of file.")
                 preview_text = '\n'.join(master_spss_syntax.split('\n')[:20]) 
             
-            st.code(preview_text + "\n\n...(Download the .sps file for the complete detailed syntax)", language='spss')
+            st.code(preview_text + "\n\n*(...Download the .sps file for the complete detailed syntax)*", language='spss')
             
         else:
             st.warning("Please define and add at least one validation rule in Step 2.")
