@@ -21,18 +21,18 @@ if 'ranking_rules' not in st.session_state:
     st.session_state.ranking_rules = []
 if 'string_rules' not in st.session_state:
     st.session_state.string_rules = []
-if 'straightliner_rules' not in st.session_state: # NEW: Straightliner Rules
+if 'straightliner_rules' not in st.session_state: 
     st.session_state.straightliner_rules = []
 if 'all_cols' not in st.session_state:
     st.session_state.all_cols = []
     
 # --- DATA LOADING FUNCTION ---
 def load_data_file(uploaded_file):
-    """Reads data from CSV or Excel files, handling different formats and CSV encoding."""
+    """Reads data from CSV, Excel, or SPSS data files, handling different formats."""
     
     file_extension = os.path.splitext(uploaded_file.name)[1].lower()
     
-    # Use keep_default_na=True but explicitly define na_values to ensure empty strings are treated as missing
+    # Define NA values for CSV/Excel
     na_values = ['', ' ', '#N/A', 'N/A', 'NA', '#NA', 'NULL', 'null']
     
     if file_extension in ['.csv']:
@@ -50,12 +50,26 @@ def load_data_file(uploaded_file):
     
     elif file_extension in ['.xlsx', '.xls']:
         # Excel files
-        # Note: pd.read_excel handles missing values by default
         return pd.read_excel(uploaded_file)
     
+    # NEW LOGIC FOR SPSS FILES (.sav, .zsav)
+    elif file_extension in ['.sav', '.zsav']:
+        # NOTE: Requires 'pyreadstat' to be installed (via requirements.txt)
+        try:
+            uploaded_file.seek(0)
+            # pd.read_spss reads SPSS files and should be able to derive the dataframe
+            df, meta = pd.read_spss(uploaded_file, convert_categoricals=False, with_meta=True)
+            return df
+        except ImportError:
+            # This error block should technically not fire if requirements.txt is used, 
+            # but is good practice to keep for local testing.
+            st.error("Error: Reading SPSS files requires the 'pyreadstat' library. Please ensure it is in your requirements.txt.")
+            raise
+        except Exception as e:
+            raise Exception(f"Failed to read SPSS data file. Please ensure it is a valid .sav or .zsav file. Error: {e}")
+    
     else:
-        # This should theoretically not be reached due to 'type' restriction in st.file_uploader
-        raise Exception(f"Unsupported file format: {file_extension}. Please upload CSV or Excel (.xlsx/.xls).")
+        raise Exception(f"Unsupported file format: {file_extension}. Please upload CSV, Excel (.xlsx/.xls), or SPSS (.sav/.zsav).")
 
 
 # --- CORE UTILITY FUNCTIONS (SYNTAX GENERATION) ---
@@ -761,15 +775,14 @@ def generate_master_spss_syntax(sq_rules, mq_rules, ranking_rules, string_rules,
         all_syntax_blocks.append(syntax)
         all_flag_cols.extend(flags)
 
-    for rule in straightliner_rules: # NEW: Straightliner Rules
+    for rule in straightliner_rules: # Straightliner Rules
         syntax, flags = generate_straightliner_spss_syntax(rule['variables'])
         all_syntax_blocks.append(syntax)
         all_flag_cols.extend(flags)
 
     for rule in string_rules:
         syntax, flags = generate_string_spss_syntax(rule)
-        all_syntax_blocks.append(syntax)
-        all_flag_cols.extend(flags)
+        all_syntax_cols.extend(flags)
 
 
     # --- Master Syntax Compilation ---
@@ -880,7 +893,7 @@ def clear_all_rules():
     st.session_state.mq_rules = []
     st.session_state.ranking_rules = []
     st.session_state.string_rules = []
-    st.session_state.straightliner_rules = [] # NEW: Clear Straightliner Rules
+    st.session_state.straightliner_rules = [] 
     if 'sq_batch_vars' in st.session_state: del st.session_state.sq_batch_vars
     if 'mq_batch_vars' in st.session_state: del st.session_state.mq_batch_vars
     if 'ranking_batch_vars' in st.session_state: del st.session_state.ranking_batch_vars
@@ -897,7 +910,7 @@ def delete_rule(rule_type, index):
         del st.session_state.ranking_rules[index]
     elif rule_type == 'string':
         del st.session_state.string_rules[index]
-    elif rule_type == 'straightliner': # NEW: Delete Straightliner Rule
+    elif rule_type == 'straightliner': 
         del st.session_state.straightliner_rules[index]
     st.rerun() 
 
@@ -965,12 +978,12 @@ def display_rules(rules, columns, header, rule_type):
 
 # --- Main App Flow ---
 
-st.header("Step 1: Upload Survey Data File (CSV, SPSS, or Excel)")
+st.header("Step 1: Upload Survey Data File (CSV, Excel, or SPSS)")
 
-# Updated file uploader to accept multiple file types (CSV, XLSX, XLS)
+# UPDATED file uploader to include SPSS file types (.sav, .zsav)
 uploaded_file = st.file_uploader(
     "Choose a Survey Data File", 
-    type=['csv', 'xlsx', 'xls'] 
+    type=['csv', 'xlsx', 'xls', 'sav', 'zsav'] 
 )
 
 if uploaded_file:
@@ -994,7 +1007,7 @@ if uploaded_file:
         
         # Display existing rules
         display_rules(st.session_state.sq_rules, ['variable'], "Current 1. Single Select (SQ) / Rating Rules", 'sq')
-        display_rules(st.session_state.straightliner_rules, ['variables'], "Current 2. Straightliner (Grid) Rules", 'straightliner') # NEW
+        display_rules(st.session_state.straightliner_rules, ['variables'], "Current 2. Straightliner (Grid) Rules", 'straightliner')
         display_rules(st.session_state.mq_rules, ['variables'], "Current 3. Multi-Select (MQ) Rules", 'mq')
         # Ranking Configuration is omitted for brevity but the generator is present
         # display_rules(st.session_state.ranking_rules, ['variables'], "Current Ranking Rules", 'ranking')
@@ -1004,7 +1017,7 @@ if uploaded_file:
         # New Configuration UIs
         configure_sq_rules(all_variable_options)
         st.markdown("---")
-        configure_straightliner_rules() # NEW
+        configure_straightliner_rules()
         st.markdown("---")
         configure_mq_rules(all_variable_options)
         st.markdown("---")
@@ -1121,4 +1134,4 @@ if uploaded_file:
             
 
     except Exception as e:
-        st.error(f"A critical error occurred during file processing or setup. Please ensure your file is a valid CSV or Excel file. Error: {e}")
+        st.error(f"A critical error occurred during file processing or setup. Please ensure your file is a valid CSV, Excel, or SPSS file. **Did you install 'pyreadstat' if uploading an SPSS file?** Error: {e}")
