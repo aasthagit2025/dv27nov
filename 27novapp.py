@@ -58,7 +58,7 @@ def load_data_file(uploaded_file):
         try:
             uploaded_file.seek(0)
             # pd.read_spss reads SPSS files and should be able to derive the dataframe
-            df, meta = pd.read_spss(uploaded_file, convert_categoricals=False, with_meta=True)
+            df, meta = pd.read_spss(uploaded_file, convert_categoricals=False)
             return df
         except ImportError:
             # This error block should technically not fire if requirements.txt is used, 
