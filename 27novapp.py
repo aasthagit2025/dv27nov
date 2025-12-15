@@ -39,6 +39,7 @@ def load_data_file(uploaded_file):
         # Try common encodings for CSV
         try:
             # Attempt UTF-8 first
+            uploaded_file.seek(0)
             return pd.read_csv(uploaded_file, encoding='utf-8', na_values=na_values, keep_default_na=True)
         except Exception:
             try:
@@ -50,16 +51,22 @@ def load_data_file(uploaded_file):
     
     elif file_extension in ['.xlsx', '.xls']:
         # Excel files
+        uploaded_file.seek(0)
         return pd.read_excel(uploaded_file)
     
-    # NEW LOGIC FOR SPSS FILES (.sav, .zsav)
+    # NEW & CORRECTED LOGIC FOR SPSS FILES (.sav, .zsav)
     elif file_extension in ['.sav', '.zsav']:
-        # NOTE: Requires 'pyreadstat' to be installed (via requirements.txt)
+        # Requires 'pyreadstat' (in requirements.txt). 
+        # Must use BytesIO to resolve "expected str, bytes... not UploadedFile" error.
         try:
             uploaded_file.seek(0)
-            # pd.read_spss reads SPSS files and should be able to derive the dataframe
-            df, meta = pd.read_spss(uploaded_file, convert_categoricals=False)
+            # 1. Read the UploadedFile content into a binary buffer
+            buffer = io.BytesIO(uploaded_file.read())
+            
+            # 2. pd.read_spss does not support 'with_meta' and takes the buffer/path
+            df = pd.read_spss(buffer, convert_categoricals=False)
             return df
+            
         except ImportError:
             # This error block should technically not fire if requirements.txt is used, 
             # but is good practice to keep for local testing.
@@ -78,7 +85,6 @@ def generate_skip_spss_syntax(target_col, trigger_col, trigger_val, rule_type, r
     """
     Generates detailed SPSS syntax for Skip Logic (Error of Omission/Commission)
     using the two-stage process: Flag_Qx (intermediate filter) -> xxQx (final EoO/EoC flag).
-    *FIXED: Replaced COMMENT with * for better SPSS compatibility.*
     """
     if '_' in target_col:
         target_clean = target_col.split('_')[0]
@@ -131,7 +137,6 @@ def generate_skip_spss_syntax(target_col, trigger_col, trigger_val, rule_type, r
 def generate_other_specify_spss_syntax(main_col, other_col, other_stub_val):
     """
     Generates syntax for Other-Specify checks (Both forward and reverse conditions).
-    *FIXED: Replaced COMMENT with * for better SPSS compatibility.*
     """
     syntax = []
     if '_' in main_col:
@@ -159,7 +164,6 @@ def generate_other_specify_spss_syntax(main_col, other_col, other_stub_val):
 def generate_piping_spss_syntax(target_col, overall_skip_filter_flag, piping_source_col, piping_stub_val):
     """
     Generates syntax for the Rating Piping/Reverse Condition check.
-    *FIXED: Replaced COMMENT with * for better SPSS compatibility.*
     """
     syntax = []
     
@@ -596,7 +600,6 @@ def configure_mq_rules(all_variable_options):
 def generate_string_spss_syntax(rule):
     """
     Generates detailed SPSS syntax for a String check.
-    *UPDATED: Added explicit Missing Check if skip is disabled. Updated comments/flag names.*
     """
     col = rule['variable']
     min_length = rule['min_length']
@@ -782,7 +785,8 @@ def generate_master_spss_syntax(sq_rules, mq_rules, ranking_rules, string_rules,
 
     for rule in string_rules:
         syntax, flags = generate_string_spss_syntax(rule)
-        all_syntax_cols.extend(flags)
+        all_syntax_blocks.append(syntax) # Use all_syntax_blocks, not all_syntax_cols
+        all_flag_cols.extend(flags)
 
 
     # --- Master Syntax Compilation ---
@@ -852,7 +856,6 @@ def generate_master_spss_syntax(sq_rules, mq_rules, ranking_rules, string_rules,
     sps_content.append("\n* --- 3. MASTER REJECT COUNT COMPUTATION --- *")
     if master_error_flags:
         temp_flag_logic = []
-        temp_flags = []
         
         # Only count final error flags (xx prefix, excluding calculated counts)
         error_flags_to_count = [f for f in master_error_flags if f.startswith(FLAG_PREFIX) and not f.endswith('_Count')]
@@ -1134,4 +1137,6 @@ if uploaded_file:
             
 
     except Exception as e:
-        st.error(f"A critical error occurred during file processing or setup. Please ensure your file is a valid CSV, Excel, or SPSS file. **Did you install 'pyreadstat' if uploading an SPSS file?** Error: {e}")
+        # A clearer error message for the user after the fixes
+        st.error(f"A critical error occurred during file processing or setup. Error: {e}")
+        st.exception(e) # Show full traceback for debugging if needed
