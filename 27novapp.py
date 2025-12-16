@@ -4,6 +4,7 @@ import numpy as np
 import io
 import time 
 import os 
+import tempfile # NEW: Required for the robust SPSS file handling fix
 
 # --- Configuration ---
 FLAG_PREFIX = "xx" 
@@ -39,7 +40,7 @@ def load_data_file(uploaded_file):
         # Try common encodings for CSV
         try:
             # Attempt UTF-8 first
-            uploaded_file.seek(0)
+            uploaded_file.seek(0) # Ensure pointer is at start
             return pd.read_csv(uploaded_file, encoding='utf-8', na_values=na_values, keep_default_na=True)
         except Exception:
             try:
@@ -51,28 +52,35 @@ def load_data_file(uploaded_file):
     
     elif file_extension in ['.xlsx', '.xls']:
         # Excel files
-        uploaded_file.seek(0)
+        uploaded_file.seek(0) # Ensure pointer is at start
         return pd.read_excel(uploaded_file)
     
-    # NEW & CORRECTED LOGIC FOR SPSS FILES (.sav, .zsav)
+    # CORRECTED LOGIC FOR SPSS FILES (.sav, .zsav) - Uses Temporary File Path
     elif file_extension in ['.sav', '.zsav']:
-        # Requires 'pyreadstat' (in requirements.txt). 
-        # Must use BytesIO to resolve "expected str, bytes... not UploadedFile" error.
+        tmp_path = None
         try:
-            uploaded_file.seek(0)
-            # 1. Read the UploadedFile content into a binary buffer
-            buffer = io.BytesIO(uploaded_file.read())
+            # 1. Use tempfile to create a path that pd.read_spss will accept
+            # This is the most reliable way to handle the "expected str, bytes... not BytesIO" error.
+            with tempfile.NamedTemporaryFile(delete=False, suffix=file_extension) as tmp_file:
+                # 2. Write the content of the UploadedFile to the temporary file
+                tmp_file.write(uploaded_file.getbuffer())
+                tmp_path = tmp_file.name
             
-            # 2. pd.read_spss does not support 'with_meta' and takes the buffer/path
-            df = pd.read_spss(buffer, convert_categoricals=False)
+            # 3. Read the data using the temporary file path
+            df = pd.read_spss(tmp_path, convert_categoricals=False)
+            
+            # 4. Clean up the temporary file immediately
+            os.remove(tmp_path)
+            
             return df
             
         except ImportError:
-            # This error block should technically not fire if requirements.txt is used, 
-            # but is good practice to keep for local testing.
             st.error("Error: Reading SPSS files requires the 'pyreadstat' library. Please ensure it is in your requirements.txt.")
             raise
         except Exception as e:
+            # Ensure file is removed if an error occurred during read
+            if tmp_path and os.path.exists(tmp_path):
+                os.remove(tmp_path)
             raise Exception(f"Failed to read SPSS data file. Please ensure it is a valid .sav or .zsav file. Error: {e}")
     
     else:
