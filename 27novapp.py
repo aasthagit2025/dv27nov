@@ -1,88 +1,98 @@
-# =========================
-# DV VALIDATION APP – FINAL (OE FIX INCLUDED)
-# =========================
+# ===========================
+# 27novapp.py – UPDATED (OE FIX ONLY)
+# ===========================
 
 import streamlit as st
 import pandas as pd
 import numpy as np
-import os
+import io
 import time
+import os
 import tempfile
 
 FLAG_PREFIX = "xx"
-
 st.set_page_config(layout="wide")
-st.title("📊 Survey Data Validation Automation")
-st.markdown("Generates **KnowledgeExcel-compatible SPSS DV syntax** using a **variable-centric UI** (No VBA).")
+st.title("📊 Survey Data Validation Automation (Variable-Centric Model)")
+st.markdown("Generates **KnowledgeExcel-compatible SPSS DV syntax** using Python (No VBA).")
 st.markdown("---")
 
-# ---------------- STATE INIT ----------------
-for k in [
-    'sq_rules','mq_rules','ranking_rules','string_rules',
-    'straightliner_rules','all_cols'
+# ===========================
+# SESSION STATE INIT
+# ===========================
+for key in [
+    'sq_rules', 'mq_rules', 'ranking_rules',
+    'string_rules', 'straightliner_rules',
+    'all_cols'
 ]:
-    if k not in st.session_state:
-        st.session_state[k] = []
+    if key not in st.session_state:
+        st.session_state[key] = []
 
-# ---------------- DATA LOADER ----------------
-def load_data(uploaded):
-    ext = os.path.splitext(uploaded.name)[1].lower()
+# ===========================
+# DATA LOADING
+# ===========================
+def load_data_file(uploaded_file):
+    ext = os.path.splitext(uploaded_file.name)[1].lower()
+
     if ext == ".csv":
-        return pd.read_csv(uploaded)
-    elif ext in [".xls",".xlsx"]:
-        return pd.read_excel(uploaded)
-    elif ext in [".sav",".zsav"]:
-        with tempfile.NamedTemporaryFile(delete=False,suffix=ext) as f:
-            f.write(uploaded.getbuffer())
-            path = f.name
-        df = pd.read_spss(path,convert_categoricals=False)
+        return pd.read_csv(uploaded_file)
+    elif ext in [".xls", ".xlsx"]:
+        return pd.read_excel(uploaded_file)
+    elif ext in [".sav", ".zsav"]:
+        with tempfile.NamedTemporaryFile(delete=False, suffix=ext) as tmp:
+            tmp.write(uploaded_file.getbuffer())
+            path = tmp.name
+        df = pd.read_spss(path, convert_categoricals=False)
         os.remove(path)
         return df
     else:
         raise Exception("Unsupported file format")
 
-# ---------------- SKIP LOGIC (KE FORMAT) ----------------
-def generate_skip_spss_syntax(target, trigger_col, trigger_val, rule_type):
-    base = target.split("_")[0]
+# ===========================
+# SKIP LOGIC GENERATOR
+# ===========================
+def generate_skip_spss_syntax(target_col, trigger_col, trigger_val, rule_type):
+    base = target_col.split("_")[0]
     filter_flag = f"Flag_{base}"
     final_flag = f"{FLAG_PREFIX}{base}"
 
     syntax = []
     syntax.append(f"**************************************SKIP LOGIC FILTER FLAG: {trigger_col}={trigger_val} -> {base}")
-    syntax.append(f"IF({trigger_col}={trigger_val}) {filter_flag}=1.")
+    syntax.append(f"IF({trigger_col} = {trigger_val}) {filter_flag}=1.")
     syntax.append("EXECUTE.\n")
 
     if rule_type == "String":
-        eoo = f"({target}='' | miss({target}))"
-        eoc = f"({target}<>'' & ~miss({target}))"
+        eoo = f"({target_col}='' | miss({target_col}))"
+        eoc = f"({target_col}<>'' & ~miss({target_col}))"
     else:
-        eoo = f"miss({target})"
-        eoc = f"~miss({target})"
+        eoo = f"miss({target_col})"
+        eoc = f"~miss({target_col})"
 
-    syntax.append(f"**************************************SKIP LOGIC EoO/EoC CHECK: {target} -> {final_flag}")
+    syntax.append(f"**************************************SKIP LOGIC EoO/EoC CHECK: {target_col} -> {final_flag}")
     syntax.append(f"IF({filter_flag}=1 & {eoo}) {final_flag}=1.")
     syntax.append(f"IF(({filter_flag}<>1 | miss({filter_flag})) & {eoc}) {final_flag}=2.")
     syntax.append("EXECUTE.\n")
 
-    return syntax,[filter_flag,final_flag]
+    return syntax, [filter_flag, final_flag]
 
-# ---------------- STRING / OE SYNTAX ----------------
-def generate_string_spss(rule):
+# ===========================
+# STRING / OE SYNTAX
+# ===========================
+def generate_string_spss_syntax(rule):
     col = rule['variable']
-    syntax=[]
-    flags=[]
+    syntax = []
+    flags = []
 
-    # Junk check
     flag_junk = f"{FLAG_PREFIX}{col}_Junk"
     syntax.append(f"**************************************OE JUNK CHECK: {col}")
-    syntax.append(f"IF(~miss({col}) & {col}<>'' & LENGTH(RTRIM({col}))<{rule['min_length']}) {flag_junk}=1.")
+    syntax.append(
+        f"IF(~miss({col}) & {col}<>'' & LENGTH(RTRIM({col})) < {rule['min_length']}) {flag_junk}=1."
+    )
     syntax.append("EXECUTE.\n")
     flags.append(flag_junk)
 
-    # OE Skip Logic
     if rule['run_skip']:
-        sl,fl = generate_skip_spss_syntax(
-            col,rule['trigger_col'],rule['trigger_val'],'String'
+        sl, fl = generate_skip_spss_syntax(
+            col, rule['trigger_col'], rule['trigger_val'], "String"
         )
         syntax.extend(sl)
         flags.extend(fl)
@@ -93,81 +103,95 @@ def generate_string_spss(rule):
         syntax.append("EXECUTE.\n")
         flags.append(flag_miss)
 
-    return syntax,flags
+    return syntax, flags
 
-# ---------------- STRING CONFIG UI (UPDATED) ----------------
-def configure_string_rules(all_vars):
-    st.subheader("4️⃣ Open-End / OE Validation")
+# ===========================
+# STRING / OE CONFIG UI (UPDATED)
+# ===========================
+def configure_string_rules(all_variable_options):
+    st.subheader("4. String / Open-End (OE) Rule Configuration")
 
-    oe_vars = st.multiselect(
-        "Select OE / TEXT Variables",
+    string_cols = st.multiselect(
+        "Select ALL OE / TEXT Variables (Qx_OE / TEXT)",
         st.session_state.all_cols,
-        key="oe_batch"
+        key='string_batch_select_key'
     )
 
-    if not oe_vars:
-        return
+    if st.button("Start / Update OE Rule Configuration"):
+        st.session_state.string_batch_vars = string_cols
 
-    with st.form("oe_form"):
-        new_rules=[]
-        for i,col in enumerate(oe_vars):
-            st.markdown(f"### ⚙️ {col}")
+    st.markdown("---")
 
-            min_len = st.number_input(
-                "Minimum Length (Junk Check)",
-                min_value=1,value=5,
-                key=f"oe_len_{i}"
-            )
+    if st.session_state.get('string_batch_vars'):
+        with st.form("string_config_form"):
+            new_rules = []
 
-            run_skip = st.checkbox(
-                "Enable OE Skip Logic (Controlled Question)",
-                key=f"oe_skip_{i}"
-            )
+            for i, col in enumerate(st.session_state.string_batch_vars):
+                st.markdown(f"### ⚙️ {col}")
 
-            if run_skip:
-                c1,c2 = st.columns(2)
-                with c1:
-                    trig_col = st.selectbox(
-                        "Parent / Controlling Question",
-                        ['-- Select --']+all_vars,
-                        key=f"oe_trig_col_{i}"
-                    )
-                with c2:
-                    trig_val = st.text_input(
-                        "Value that ENABLES OE (e.g. 99)",
-                        key=f"oe_trig_val_{i}"
-                    )
-            else:
-                trig_col='-- Select --'
-                trig_val=''
+                min_length = st.number_input(
+                    "Minimum Length (Junk Check)",
+                    min_value=1,
+                    value=5,
+                    key=f"oe_len_{i}"
+                )
 
-            new_rules.append({
-                'variable':col,
-                'min_length':min_len,
-                'run_skip':run_skip and trig_col!='-- Select --',
-                'trigger_col':trig_col,
-                'trigger_val':trig_val
-            })
+                run_skip = st.checkbox(
+                    "Enable OE Skip Logic (EOO / EOC)",
+                    key=f"oe_skip_{i}"
+                )
 
-        if st.form_submit_button("✅ Save OE Rules"):
-            st.session_state.string_rules.extend(new_rules)
-            st.success("OE rules saved")
-            st.rerun()
+                if run_skip:
+                    st.info("Select the parent question and value that ENABLES this OE.")
+                    c1, c2 = st.columns(2)
+                    with c1:
+                        trigger_col = st.selectbox(
+                            "Parent / Controlling Question",
+                            ['-- Select Variable --'] + all_variable_options,
+                            key=f"oe_trig_col_{i}"
+                        )
+                    with c2:
+                        trigger_val = st.text_input(
+                            "Value that enables OE (e.g. 99)",
+                            key=f"oe_trig_val_{i}"
+                        )
+                else:
+                    trigger_col = '-- Select Variable --'
+                    trigger_val = ''
 
-# ---------------- MASTER SYNTAX ----------------
-def generate_master():
-    all_syntax=[]
-    all_flags=[]
+                new_rules.append({
+                    'variable': col,
+                    'min_length': min_length,
+                    'run_skip': run_skip and trigger_col != '-- Select Variable --',
+                    'trigger_col': trigger_col,
+                    'trigger_val': trigger_val
+                })
 
-    for r in st.session_state.string_rules:
-        s,f=generate_string_spss(r)
+            if st.form_submit_button("✅ Save OE Rules"):
+                st.session_state.string_rules = [
+                    r for r in st.session_state.string_rules
+                    if r['variable'] not in st.session_state.string_batch_vars
+                ] + new_rules
+                st.session_state.string_batch_vars = []
+                st.success("OE rules saved successfully.")
+                st.rerun()
+
+# ===========================
+# MASTER SYNTAX GENERATION
+# ===========================
+def generate_master_spss_syntax():
+    all_syntax = []
+    all_flags = []
+
+    for rule in st.session_state.string_rules:
+        s, f = generate_string_spss_syntax(rule)
         all_syntax.extend(s)
         all_flags.extend(f)
 
-    sps=[]
-    sps.append("*============================================================*")
+    sps = []
+    sps.append("*==============================================================*")
     sps.append("* PYTHON GENERATED DV SCRIPT – KNOWLEDGEEXCEL FORMAT *")
-    sps.append("*============================================================*\n")
+    sps.append("*==============================================================*\n")
     sps.append("DATASET ACTIVATE ALL.\n")
 
     if all_flags:
@@ -175,29 +199,34 @@ def generate_master():
         sps.append(f"RECODE {'; '.join(sorted(set(all_flags)))} (ELSE=0).")
         sps.append("EXECUTE.\n")
 
-    sps.append("\n* --- VALIDATION LOGIC --- *")
+    sps.append("\n* --- DETAILED VALIDATION LOGIC --- *")
     sps.extend(all_syntax)
 
     return "\n".join(sps)
 
-# ---------------- MAIN APP ----------------
+# ===========================
+# MAIN APP
+# ===========================
 st.header("Step 1: Upload Survey Data")
-uploaded = st.file_uploader("Upload CSV / Excel / SPSS",type=["csv","xls","xlsx","sav","zsav"])
+uploaded_file = st.file_uploader(
+    "Upload CSV / Excel / SPSS File",
+    type=["csv", "xls", "xlsx", "sav", "zsav"]
+)
 
-if uploaded:
-    df = load_data(uploaded)
+if uploaded_file:
+    df = load_data_file(uploaded_file)
     st.session_state.all_cols = sorted(df.columns.tolist())
-    st.success(f"Loaded {len(df)} rows, {len(df.columns)} columns")
+    st.success(f"Loaded {len(df)} rows and {len(df.columns)} variables")
 
     configure_string_rules(st.session_state.all_cols)
 
     st.header("Step 3: Generate Syntax")
     if st.session_state.string_rules:
-        final_sps = generate_master()
+        final_syntax = generate_master_spss_syntax()
         st.download_button(
             "⬇️ Download SPSS DV Syntax",
-            final_sps,
+            final_syntax,
             file_name="dv_validation_knowledgeexcel.sps",
             mime="text/plain"
         )
-        st.code(final_sps[:3000])
+        st.code(final_syntax[:4000])
