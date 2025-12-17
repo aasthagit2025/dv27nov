@@ -10,9 +10,9 @@ import tempfile
 FLAG_PREFIX = "xx" 
 st.set_page_config(layout="wide")
 st.title("📊 Survey Data Validation Automation")
-st.markdown("Generates **KnowledgeExcel-compatible SPSS syntax** with Skip Logic and Frequencies.")
+st.markdown("Generates **KnowledgeExcel-compatible SPSS syntax**.")
 
-# Initialize state for storing rules
+# Initialize state
 if 'sq_rules' not in st.session_state: st.session_state.sq_rules = []
 if 'mq_rules' not in st.session_state: st.session_state.mq_rules = []
 if 'string_rules' not in st.session_state: st.session_state.string_rules = []
@@ -41,12 +41,11 @@ def generate_skip_spss_syntax(target_col, trigger_col, trigger_val, rule_type):
     final_error_flag = f"{FLAG_PREFIX}{target_clean}" 
     
     syntax = [
-        f"* Filter logic: {target_clean} asked if {trigger_col} = {trigger_val}",
+        f"* Filter logic for {target_clean}",
         f"IF({trigger_col} = {trigger_val}) {filter_flag}=1.",
         f"EXECUTE.\n"
     ]
     
-    # Define EoO/EoC conditions based on type
     if rule_type == 'String':
         eoo = f"({target_col}='' | miss({target_col}))"
         eoc = f"({target_col}<>'' & ~miss({target_col}))"
@@ -59,7 +58,8 @@ def generate_skip_spss_syntax(target_col, trigger_col, trigger_val, rule_type):
     syntax.append("EXECUTE.\n")
     return syntax, [filter_flag, final_error_flag]
 
-# --- UPDATED MQ CONFIGURATION (With Skip/Filter) ---
+# --- UI CONFIGURATION SECTIONS (ROLLBACK TO SEQUENTIAL UI) ---
+
 def configure_mq_rules(all_variable_options):
     st.subheader("3. Multi-Select (MQ) Configuration")
     mq_cols = st.multiselect("Select Variables for MQ Group", st.session_state.all_cols, key='mq_batch')
@@ -68,19 +68,17 @@ def configure_mq_rules(all_variable_options):
         st.session_state.mq_batch_vars = mq_cols
 
     if st.session_state.get('mq_batch_vars'):
-        mq_set_name = st.session_state.mq_batch_vars[0].split('_')[0]
-        with st.form(f"mq_form_{mq_set_name}"):
-            st.markdown(f"### ⚙️ Rule for **{mq_set_name}**")
-            
-            # Filter Inputs (Matching Screenshot)
+        with st.form("mq_form"):
+            st.markdown(f"### ⚙️ Rule for Multi-Select Group")
+            # Added Skip Logic fields to MQ
             c1, c2 = st.columns(2)
             with c1:
-                skip_col = st.selectbox("Filter/Trigger Variable", all_variable_options, key='mq_skip_col')
+                skip_col = st.selectbox("Filter/Trigger Variable", all_variable_options, key='mq_s_col')
             with c2:
-                skip_val = st.text_input("Filter Condition Value", "1", key='mq_skip_val')
+                skip_val = st.text_input("Filter Condition Value", "1", key='mq_s_val')
             
-            run_skip = st.checkbox("Enable Standard Skip Logic Check", key='mq_skip_enable')
-            
+            run_skip = st.checkbox("Enable Standard Skip Logic Check", key='mq_s_run')
+
             if st.form_submit_button("✅ Save MQ Rule"):
                 st.session_state.mq_rules.append({
                     'variables': st.session_state.mq_batch_vars,
@@ -89,10 +87,9 @@ def configure_mq_rules(all_variable_options):
                 st.session_state.mq_batch_vars = []
                 st.rerun()
 
-# --- UPDATED STRING CONFIGURATION (Matching Screenshot) ---
 def configure_string_rules(all_variable_options):
     st.subheader("4. String/Open-End Configuration")
-    string_cols = st.multiselect("Select Target Variables for String/OE", st.session_state.all_cols, key='str_batch')
+    string_cols = st.multiselect("Select Variables for String/OE", st.session_state.all_cols, key='str_batch')
     
     if st.button("Start String Config"):
         st.session_state.string_batch_vars = string_cols
@@ -104,7 +101,7 @@ def configure_string_rules(all_variable_options):
                 st.markdown(f"### ⚙️ Rule for **{col}**")
                 min_len = st.number_input(f"Min Length for {col}", 1, 100, 5, key=f"slen_{i}")
                 
-                # Filter Inputs (Matching Screenshot)
+                # Added Skip Logic fields to String (Matching SQ layout)
                 c1, c2 = st.columns(2)
                 with c1:
                     skip_col = st.selectbox(f"Filter Variable for {col}", all_variable_options, key=f"scol_{i}")
@@ -117,55 +114,58 @@ def configure_string_rules(all_variable_options):
                     'variable': col, 'min_length': min_len, 'run_skip': run_skip,
                     'trigger_col': skip_col, 'trigger_val': skip_val
                 })
-            
+
             if st.form_submit_button("✅ Save String Rules"):
                 st.session_state.string_rules.extend(new_rules)
                 st.session_state.string_batch_vars = []
                 st.rerun()
 
-# --- FINAL SYNTAX GENERATION (No Sum, Frequencies Only) ---
-def generate_final_syntax():
-    all_syntax = ["DATASET ACTIVATE ALL.\n"]
+# --- FINAL SYNTAX GENERATOR (NO SUM, JUST FREQUENCIES) ---
+def generate_master_syntax():
+    all_syntax = ["DATASET ACTIVATE ALL."]
     all_flags = []
 
-    # Process MQ Rules
-    for rule in st.session_state.mq_rules:
-        if rule['run_skip'] and rule['trigger_col'] != '-- Select Variable --':
-            syn, flags = generate_skip_spss_syntax(rule['variables'][0], rule['trigger_col'], rule['trigger_val'], 'MQ')
-            all_syntax.extend(syn); all_flags.extend(flags)
-
-    # Process String Rules
+    # Process String/MQ/SQ Logic...
     for rule in st.session_state.string_rules:
         if rule['run_skip'] and rule['trigger_col'] != '-- Select Variable --':
             syn, flags = generate_skip_spss_syntax(rule['variable'], rule['trigger_col'], rule['trigger_val'], 'String')
-            all_syntax.extend(syn); all_flags.extend(flags)
+            all_syntax.extend(syn)
+            all_flags.extend(flags)
         
-        # Junk Check
         f_junk = f"{FLAG_PREFIX}{rule['variable']}_Junk"
         all_syntax.append(f"IF(~miss({rule['variable']}) & length(rtrim({rule['variable']}))<{rule['min_length']}) {f_junk}=1.")
         all_flags.append(f_junk)
 
-    # Final Frequencies (REPLACES MASTER SUM)
+    # Process MQ Logic...
+    for rule in st.session_state.mq_rules:
+        if rule['run_skip'] and rule['trigger_col'] != '-- Select Variable --':
+            syn, flags = generate_skip_spss_syntax(rule['variables'][0], rule['trigger_col'], rule['trigger_val'], 'MQ')
+            all_syntax.extend(syn)
+            all_flags.extend(flags)
+
     unique_flags = sorted(list(set(all_flags)))
     if unique_flags:
         all_syntax.insert(1, f"NUMERIC {' '.join(unique_flags)}.")
-        all_syntax.insert(2, f"RECODE {' '.join(unique_flags)} (ELSE=0).\n")
+        all_syntax.insert(2, f"RECODE {' '.join(unique_flags)} (ELSE=0).")
+        # Final Frequency report at the end instead of Sum
         all_syntax.append("\n* --- VALIDATION FREQUENCIES --- *")
         all_syntax.append(f"FREQUENCIES VARIABLES={' '.join(unique_flags)} /ORDER=ANALYSIS.")
     
     return "\n".join(all_syntax)
 
-# --- UI APP ---
-uploaded_file = st.file_uploader("Upload Survey Data", type=['csv', 'xlsx', 'sav'])
+# --- APP FLOW ---
+uploaded_file = st.file_uploader("Upload Data", type=['csv', 'xlsx', 'sav'])
 if uploaded_file:
     df = load_data_file(uploaded_file)
     st.session_state.all_cols = list(df.columns)
     all_vars = ['-- Select Variable --'] + st.session_state.all_cols
     
+    # Sequential UI as per original script
+    # (SQ Section would be here)
     configure_mq_rules(all_vars)
     configure_string_rules(all_vars)
     
-    if st.button("Generate Final Syntax"):
-        final_code = generate_final_syntax()
-        st.code(final_code, language='spss')
-        st.download_button("Download Script (.sps)", final_code, "survey_validation.sps")
+    if st.button("Generate Master Syntax"):
+        output = generate_master_syntax()
+        st.code(output, language='spss')
+        st.download_button("Download .sps", output, "validation.sps")
