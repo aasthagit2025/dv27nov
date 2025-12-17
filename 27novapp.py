@@ -605,7 +605,6 @@ def configure_mq_rules(all_variable_options):
                     else:
                         st.warning("Please select columns for the MQ group.")
 
-def generate_string_spss_syntax(rule):
     """
     Generates detailed SPSS syntax for a String check.
     """
@@ -703,7 +702,7 @@ def configure_string_rules(all_variable_options):
                 new_string_rules.append({
                     'variable': col,
                     'min_length': min_length,
-                    'run_skip': run_skip and skip_trigger_col != '-- Select Variable --',
+                    'run_skip': run_skip,
                     'trigger_col': skip_trigger_col,
                     'trigger_val': skip_trigger_val,
                 })
