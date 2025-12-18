@@ -179,7 +179,7 @@ def generate_piping_spss_syntax(target_col, overall_skip_filter_flag, piping_sou
     
     # 1. Error of Omission (EOO) - Target is missing/wrong when piping condition is met
     syntax.append(f"**************************************PIPING (EOO) Check: (Filter={overall_skip_filter_flag}=1) AND ({piping_source_col}={piping_stub_val}) AND {target_col}<>{piping_stub_val}")
-    syntax.append(f"* EoO (1): Piping/Skip met, Target value is wrong/missing. IF(((Flag_Q12=1) & Q11=1 ) & Q12_1<>1)xxQ12_1=1.")
+	    syntax.append(f"* EoO (1): Piping/Skip met, Target value is wrong/missing. IF(((Flag_Q12=1) & Q11=1 ) & Q12_1<>1)xxQ12_1=1.")
     syntax.append(f"IF(({overall_skip_filter_flag}=1) & ({piping_source_col}={piping_stub_val}) & {target_col}<>{piping_stub_val}) {flag_col}=1.")
     
     # 2. Error of Commission (EOC / Reverse Condition) - Target has data when piping condition is NOT met
@@ -605,14 +605,14 @@ def configure_mq_rules(all_variable_options):
                     else:
                         st.warning("Please select columns for the MQ group.")
 
-def generate_string_spss_syntax(rule):
     """Generates OE syntax with length check and optional Skip/Filter logic."""
+def generate_string_spss_syntax(rule):
     col = rule['variable']
     target_clean = col.split('_')[0] if '_' in col else col
     filter_flag = f"Flag_{target_clean}" 
     final_error_flag = f"{FLAG_PREFIX}{col}"
-    
     syntax = []
+
     # 1. Junk Check (Always runs)
     flag_junk = f"{FLAG_PREFIX}{col}_Junk"
     syntax.append(f"**************************************OE Length Check: {col}")
@@ -621,9 +621,7 @@ def generate_string_spss_syntax(rule):
     # 2. Skip Logic or Standard Mandatory Check
     if rule.get('run_skip') and rule['trigger_col'] != '-- Select Variable --':
         syntax.append(f"IF({rule['trigger_col']} = {rule['trigger_val']}) {filter_flag}=1.")
-        # Error of Omission (1): Triggered but empty
         syntax.append(f"IF({filter_flag} = 1 & ({col}='' | miss({col}))) {final_error_flag}=1.")
-        # Error of Commission (2): Not triggered but has content
         syntax.append(f"IF(({filter_flag} <> 1 | miss({filter_flag})) & ({col}<>'' & ~miss({col}))) {final_error_flag}=2.")
     else:
         # Standard Mandatory check if skip is not enabled
@@ -631,7 +629,6 @@ def generate_string_spss_syntax(rule):
         syntax.append(f"IF({col}='' | miss({col})) {flag_miss}=1.")
     
     syntax.append("EXECUTE.\n")
-
     return syntax, [flag_junk, filter_flag, final_error_flag]
 
 def configure_string_rules(all_variable_options):
