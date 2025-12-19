@@ -26,6 +26,19 @@ if 'straightliner_rules' not in st.session_state:
     st.session_state.straightliner_rules = []
 if 'all_cols' not in st.session_state:
     st.session_state.all_cols = []
+
+for k in [
+    'sq_rules',
+    'mq_rules',
+    'ranking_rules',
+    'string_rules',
+    'straightliner_rules',
+    'all_cols',
+    'string_batch_vars'   # ✅ ADD THIS
+]:
+    if k not in st.session_state:
+        st.session_state[k] = []
+
     
 # --- DATA LOADING FUNCTION ---
 def load_data_file(uploaded_file):
