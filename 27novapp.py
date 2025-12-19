@@ -89,57 +89,34 @@ def load_data_file(uploaded_file):
 
 # --- CORE UTILITY FUNCTIONS (SYNTAX GENERATION) ---
 
-def generate_skip_spss_syntax(target_col, trigger_col, trigger_val, rule_type, range_min=None, range_max=None):
-    """
-    Generates detailed SPSS syntax for Skip Logic (Error of Omission/Commission)
-    using the two-stage process: Flag_Qx (intermediate filter) -> xxQx (final EoO/EoC flag).
-    """
-    if '_' in target_col:
-        target_clean = target_col.split('_')[0]
+def generate_skip_spss_syntax(target_col, trigger_col, trigger_val, rule_type):
+    base = target_col.split('_')[0]
+    flag_filter = f"Flag_{base}"
+    flag_final = f"{FLAG_PREFIX}{base}"
+
+    # STEP 1: Numeric question triggered by OE filled
+    if rule_type == 'NumericFromString':
+        trigger_condition = f"{trigger_col}<>''"
+        eoo = f"miss({target_col})"
+        eoc = f"~miss({target_col})"
     else:
-        target_clean = target_col
-        
-    filter_flag = f"Flag_{target_clean}" 
-    final_error_flag = f"{FLAG_PREFIX}{target_clean}" 
-    
-    syntax = []
-    
-    # Stage 1: Filter Flag (Flag_Qx)
-    syntax.append(f"**************************************SKIP LOGIC FILTER FLAG: {trigger_col}={trigger_val} -> {target_clean}")
-    syntax.append(f"* Qx should ONLY be asked if {trigger_col} = {trigger_val}.")
-    syntax.append(f"IF({trigger_col} = {trigger_val}) {filter_flag}=1.")
-    syntax.append(f"EXECUTE.\n") 
-    
-    if rule_type == 'SQ' and range_min is not None and range_max is not None:
-        # EoO: Trigger met AND (Missing OR Out-of-Range)
-        eoo_condition = f"(miss({target_col}) | ~range({target_col},{range_min},{range_max}))"
-        # EoC: Trigger NOT met AND (Answered)
-        eoc_condition = f"~miss({target_col})" 
-        
-    elif rule_type == 'String':
-        # EoO: Trigger met AND (Missing OR Empty String)
-        eoo_condition = f"({target_col}='' | miss({target_col}))"
-        # EoC: Trigger NOT met AND (Not Missing AND Not Empty)
-        eoc_condition = f"({target_col}<>'' & ~miss({target_col}))" 
-        
-    else: # MQ/Ranking/General
-        eoo_condition = f"miss({target_col})"
-        eoc_condition = f"~miss({target_col})" 
-        
-    # --- EoO/EoC Logic ---
-    syntax.append(f"**************************************SKIP LOGIC EoO/EoC CHECK: {target_col} -> {final_error_flag}")
-    
-    # Error of Omission (EoO) - Flag=1
-    syntax.append(f"* EoO (1): Trigger Met ({filter_flag}=1), Target Fails Check/Missing/Out-of-Range/Empty.")
-    syntax.append(f"IF({filter_flag} = 1 & {eoo_condition}) {final_error_flag}=1.")
-    
-    # Error of Commission (EoC) - Flag=2
-    syntax.append(f"* EoC (2): Trigger Not Met ({filter_flag}<>1 | miss({filter_flag})), Target Answered.")
-    syntax.append(f"IF(({filter_flag} <> 1 | miss({filter_flag})) & {eoc_condition}) {final_error_flag}=2.")
-    
-    syntax.append("EXECUTE.\n")
-    
-    return syntax, [filter_flag, final_error_flag]
+        trigger_condition = f"{trigger_col}={trigger_val}"
+        if rule_type == 'String':
+            eoo = f"{target_col}=''"
+            eoc = f"{target_col}<>''"
+        else:
+            eoo = f"miss({target_col})"
+            eoc = f"~miss({target_col})"
+
+    syntax = [
+        f"IF({trigger_condition}) {flag_filter}=1.",
+        "EXECUTE.",
+        f"IF({flag_filter}=1 & {eoo}) {flag_final}=1.",
+        f"IF(({flag_filter}<>1 | miss({flag_filter})) & {eoc}) {flag_final}=2.",
+        "EXECUTE."
+    ]
+    return syntax, [flag_filter, flag_final]
+
 
 
 def generate_other_specify_spss_syntax(main_col, other_col, other_stub_val):
