@@ -89,34 +89,57 @@ def load_data_file(uploaded_file):
 
 # --- CORE UTILITY FUNCTIONS (SYNTAX GENERATION) ---
 
-def generate_skip_spss_syntax(target_col, trigger_col, trigger_val, rule_type):
-    base = target_col.split('_')[0]
-    flag_filter = f"Flag_{base}"
-    flag_final = f"{FLAG_PREFIX}{base}"
-
-    # STEP 1: Numeric question triggered by OE filled
-    if rule_type == 'NumericFromString':
-        trigger_condition = f"{trigger_col}<>''"
-        eoo = f"miss({target_col})"
-        eoc = f"~miss({target_col})"
+def generate_skip_spss_syntax(target_col, trigger_col, trigger_val, rule_type, range_min=None, range_max=None):
+    """
+    Generates detailed SPSS syntax for Skip Logic (Error of Omission/Commission)
+    using the two-stage process: Flag_Qx (intermediate filter) -> xxQx (final EoO/EoC flag).
+    """
+    if '_' in target_col:
+        target_clean = target_col.split('_')[0]
     else:
-        trigger_condition = f"{trigger_col}={trigger_val}"
-        if rule_type == 'String':
-            eoo = f"{target_col}=''"
-            eoc = f"{target_col}<>''"
-        else:
-            eoo = f"miss({target_col})"
-            eoc = f"~miss({target_col})"
-
-    syntax = [
-        f"IF({trigger_condition}) {flag_filter}=1.",
-        "EXECUTE.",
-        f"IF({flag_filter}=1 & {eoo}) {flag_final}=1.",
-        f"IF(({flag_filter}<>1 | miss({flag_filter})) & {eoc}) {flag_final}=2.",
-        "EXECUTE."
-    ]
-    return syntax, [flag_filter, flag_final]
-
+        target_clean = target_col
+        
+    filter_flag = f"Flag_{target_clean}" 
+    final_error_flag = f"{FLAG_PREFIX}{target_clean}" 
+    
+    syntax = []
+    
+    # Stage 1: Filter Flag (Flag_Qx)
+    syntax.append(f"**************************************SKIP LOGIC FILTER FLAG: {trigger_col}={trigger_val} -> {target_clean}")
+    syntax.append(f"* Qx should ONLY be asked if {trigger_col} = {trigger_val}.")
+    syntax.append(f"IF({trigger_col} = {trigger_val}) {filter_flag}=1.")
+    syntax.append(f"EXECUTE.\n") 
+    
+    if rule_type == 'SQ' and range_min is not None and range_max is not None:
+        # EoO: Trigger met AND (Missing OR Out-of-Range)
+        eoo_condition = f"(miss({target_col}) | ~range({target_col},{range_min},{range_max}))"
+        # EoC: Trigger NOT met AND (Answered)
+        eoc_condition = f"~miss({target_col})" 
+        
+    elif rule_type == 'String':
+        # EoO: Trigger met AND (Missing OR Empty String)
+        eoo_condition = f"({target_col}='' | miss({target_col}))"
+        # EoC: Trigger NOT met AND (Not Missing AND Not Empty)
+        eoc_condition = f"({target_col}<>'' & ~miss({target_col}))" 
+        
+    else: # MQ/Ranking/General
+        eoo_condition = f"miss({target_col})"
+        eoc_condition = f"~miss({target_col})" 
+        
+    # --- EoO/EoC Logic ---
+    syntax.append(f"**************************************SKIP LOGIC EoO/EoC CHECK: {target_col} -> {final_error_flag}")
+    
+    # Error of Omission (EoO) - Flag=1
+    syntax.append(f"* EoO (1): Trigger Met ({filter_flag}=1), Target Fails Check/Missing/Out-of-Range/Empty.")
+    syntax.append(f"IF({filter_flag} = 1 & {eoo_condition}) {final_error_flag}=1.")
+    
+    # Error of Commission (EoC) - Flag=2
+    syntax.append(f"* EoC (2): Trigger Not Met ({filter_flag}<>1 | miss({filter_flag})), Target Answered.")
+    syntax.append(f"IF(({filter_flag} <> 1 | miss({filter_flag})) & {eoc_condition}) {final_error_flag}=2.")
+    
+    syntax.append("EXECUTE.\n")
+    
+    return syntax, [filter_flag, final_error_flag]
 
 
 def generate_other_specify_spss_syntax(main_col, other_col, other_stub_val):
@@ -619,99 +642,100 @@ def generate_string_spss_syntax(rule):
         generated_flags.extend(sl_flags)
         
     return syntax, generated_flags
-
 def configure_string_rules(all_variable_options):
-    """Handles batch selection and sequential configuration of String / OE rules
-       FIXED: OE Skip logic now asks controlling (parent) question + trigger value
-       FIXED: Removed duplicated A/B blocks and duplicate submit buttons
     """
-    st.subheader("4. String / Open-End (OE) Rule Configuration")
+    FINAL LOCKED VERSION
+    - OE Skip UI is OUTSIDE the form (Streamlit-safe)
+    - Skip UI will NEVER disappear again
+    """
 
-    string_cols = st.multiselect(
-        "Select ALL OE / TEXT Variables (Qx_OE / Qx_TEXT)",
+    st.subheader("4. String / Open-End (OE) Configuration")
+
+    # Step 1: Select OE variables
+    selected = st.multiselect(
+        "Select Open-End (OE) variables",
         st.session_state.all_cols,
-        key='string_batch_select_key',
-        default=st.session_state.get('string_batch_vars', [])
+        default=st.session_state.string_batch_vars
     )
 
-    if st.button("Start/Update OE Rule Configuration", key='start_string_config_btn'):
-        st.session_state.string_batch_vars = string_cols
+    if st.button("Configure OE"):
+        st.session_state.string_batch_vars = selected
 
-    st.markdown("---")
-
-    if not st.session_state.get('string_batch_vars'):
+    if not st.session_state.string_batch_vars:
         return
 
-    st.info(f"Configuring **{len(st.session_state.string_batch_vars)}** OE variables one-by-one.")
+    # Loop through each OE variable
+    for i, col in enumerate(st.session_state.string_batch_vars):
 
-    with st.form("string_config_form"):
-        new_string_rules = []
+        st.markdown(f"### {col}")
 
-        for i, col in enumerate(st.session_state.string_batch_vars):
-            st.markdown(f"### ⚙️ Rule Configuration for **{col}**")
+        existing = next(
+            (r for r in st.session_state.string_rules if r['variable'] == col),
+            {}
+        )
 
-            existing_rule = next(
-                (r for r in st.session_state.string_rules if r['variable'] == col),
-                {}
-            )
+        key = f"oe_{i}"
 
-            key_prefix = f'string_{col}_{i}'
+        # ----------------------------
+        # B. OE SKIP LOGIC (OUTSIDE FORM)
+        # ----------------------------
+        st.markdown("#### B. OE Skip Logic")
 
-            # A. Junk / Minimum Length Check
+        run_skip = st.checkbox(
+            "Enable OE Skip Logic",
+            value=existing.get('run_skip', False),
+            key=f"{key}_skip_ui"
+        )
+
+        if run_skip:
+            c1, c2 = st.columns(2)
+            with c1:
+                trigger_col = st.selectbox(
+                    "Parent / Controlling Question",
+                    all_variable_options,
+                    index=all_variable_options.index(existing.get('trigger_col'))
+                    if existing.get('trigger_col') in all_variable_options else 0,
+                    key=f"{key}_tcol_ui"
+                )
+            with c2:
+                trigger_val = st.text_input(
+                    "Trigger Value (e.g. 1, 99)",
+                    value=existing.get('trigger_val', ''),
+                    key=f"{key}_tval_ui"
+                )
+        else:
+            trigger_col = '-- Select Variable --'
+            trigger_val = ''
+
+        # ----------------------------
+        # A. JUNK CHECK + SAVE (FORM)
+        # ----------------------------
+        with st.form(f"oe_form_{i}"):
+
             st.markdown("#### A. Junk Answer Check")
-            min_length = st.number_input(
+
+            min_len = st.number_input(
                 "Minimum Length (characters)",
                 min_value=1,
-                value=existing_rule.get('min_length', 5),
-                key=f'{key_prefix}_min_len'
+                value=existing.get('min_length', 5),
+                key=f"{key}_len_form"
             )
 
-            # B. OE Skip Logic
-            st.markdown("#### B. OE Skip Logic (Controlling Question)")
-            run_skip = st.checkbox(
-                "Enable OE Skip Logic (EOO / EOC)",
-                value=existing_rule.get('run_skip', False),
-                key=f'{key_prefix}_run_skip'
-            )
+            if st.form_submit_button("Save OE Rule"):
 
-            if run_skip:
-                with st.container(border=True):
-                    col_tq, col_tv = st.columns(2)
-                    with col_tq:
-                        trigger_col = st.selectbox(
-                            "Parent / Controlling Question",
-                            all_variable_options,
-                            index=all_variable_options.index(existing_rule.get('trigger_col'))
-                            if existing_rule.get('trigger_col') in all_variable_options else 0,
-                            key=f'{key_prefix}_trigger_col'
-                        )
-                    with col_tv:
-                        trigger_val = st.text_input(
-                            "Value that ENABLES OE (e.g. 1, 99)",
-                            value=existing_rule.get('trigger_val', ''),
-                            key=f'{key_prefix}_trigger_val'
-                        )
-            else:
-                trigger_col = '-- Select Variable --'
-                trigger_val = ''
+                st.session_state.string_rules = [
+                    r for r in st.session_state.string_rules
+                    if r['variable'] != col
+                ] + [{
+                    'variable': col,
+                    'min_length': min_len,
+                    'run_skip': run_skip and trigger_col != '-- Select Variable --',
+                    'trigger_col': trigger_col,
+                    'trigger_val': trigger_val
+                }]
 
-            new_string_rules.append({
-                'variable': col,
-                'min_length': min_length,
-                'run_skip': run_skip and trigger_col != '-- Select Variable --',
-                'trigger_col': trigger_col,
-                'trigger_val': trigger_val
-            })
-
-        if st.form_submit_button("✅ Save ALL OE Rules"):
-            remaining = [
-                r for r in st.session_state.string_rules
-                if r['variable'] not in st.session_state.string_batch_vars
-            ]
-            st.session_state.string_rules = remaining + new_string_rules
-            st.session_state.string_batch_vars = []
-            st.success(f"Saved OE rules for {len(new_string_rules)} variables.")
-            st.rerun()
+                st.success(f"Saved OE rule for {col}")
+                st.rerun()
 
 
 # Ranking functions remain here...
