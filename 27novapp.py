@@ -1049,13 +1049,13 @@ if uploaded_file:
 # --------------------------------------------------
 # AUTO-DETECT VARIABLE TYPES (String vs Numeric)
 # --------------------------------------------------
-if 'string_vars' not in st.session_state:
-    st.session_state.string_vars = df_raw.select_dtypes(
+     if 'string_vars' not in st.session_state:
+        st.session_state.string_vars = df_raw.select_dtypes(
         include=['object']
     ).columns.tolist()
 
-if 'numeric_vars' not in st.session_state:
-    st.session_state.numeric_vars = df_raw.select_dtypes(
+    if 'numeric_vars' not in st.session_state:
+        st.session_state.numeric_vars = df_raw.select_dtypes(
         exclude=['object']
     ).columns.tolist()
 
