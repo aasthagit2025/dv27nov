@@ -27,18 +27,12 @@ if 'straightliner_rules' not in st.session_state:
 if 'all_cols' not in st.session_state:
     st.session_state.all_cols = []
 
-for k in [
-    'sq_rules',
-    'mq_rules',
-    'ranking_rules',
-    'string_rules',
-    'straightliner_rules',
-    'all_cols',
-    'string_batch_vars'   # ✅ ADD THIS
-]:
+# Initialize state for storing final, configured rules
+keys = ['sq_rules', 'mq_rules', 'ranking_rules', 'string_rules', 'straightliner_rules', 
+        'all_cols', 'sq_batch_vars', 'oe_batch_vars', 'var_types']
+for k in keys:
     if k not in st.session_state:
-        st.session_state[k] = []
-
+        st.session_state[k] = [] if k != 'var_types' else {}
     
 # --- DATA LOADING FUNCTION ---
 def load_data_file(uploaded_file):
@@ -84,7 +78,36 @@ def load_data_file(uploaded_file):
             
             # 4. Clean up the temporary file immediately
             os.remove(tmp_path)
-            
+
+# After df is created (e.g., df = pd.read_spss(...))
+    if df is not None:
+        # 1. Preserve SPSS Order: Store columns exactly as they appear in the file
+        st.session_state.all_cols = list(df.columns)
+        
+        # 2. Detect Types: Automatically identify string vs numeric
+        st.session_state.var_types = {
+            col: 'string' if pd.api.types.is_string_dtype(df[col]) or pd.api.types.is_object_dtype(df[col]) else 'numeric'
+            for col in df.columns
+
+# --- TYPE-SENSITIVE LOGIC HELPERS ---
+
+def is_string(col):
+    """Checks if a variable is a string type based on auto-detection."""
+    return st.session_state.get('var_types', {}).get(col) == 'string'
+
+def get_missing_logic(col):
+    """Uses blank ('') for strings and miss() for numeric."""
+    if is_string(col):
+        return f"({col} = '' | miss({col}))"
+    return f"miss({col})"
+
+def get_answered_logic(col):
+    """Uses <> '' for strings and ~miss() for numeric."""
+    if is_string(col):
+        return f"({col} <> '' & ~miss({col}))"
+    return f"~miss({col})"
+        }
+                
             return df
             
         except ImportError:
@@ -101,6 +124,32 @@ def load_data_file(uploaded_file):
 
 
 # --- CORE UTILITY FUNCTIONS (SYNTAX GENERATION) ---
+
+
+# --- TYPE-SENSITIVE LOGIC HELPERS ---
+
+def is_string(col):
+    """Checks if a variable is a string type."""
+    return st.session_state.get('var_types', {}).get(col) == 'string'
+
+def get_missing_logic(col):
+    """Requirement: Use blank ('') for strings and miss() for numeric."""
+    if is_string(col):
+        return f"({col} = '' | miss({col}))"
+    return f"miss({col})"
+
+def get_answered_logic(col):
+    """Requirement: Use <> '' for strings and ~miss() for numeric."""
+    if is_string(col):
+        return f"({col} <> '' & ~miss({col}))"
+    return f"~miss({col})"
+
+def get_comp_logic(col, val):
+    """Wraps values in quotes if the trigger column is a string type."""
+    # If the user enters a number but the column is string, wrap in quotes
+    formatted_val = f"'{val}'" if is_string(col) else val
+    return f"{col} = {formatted_val}"
+
 
 def generate_skip_spss_syntax(target_col, trigger_col, trigger_val, rule_type, range_min=None, range_max=None):
     """
@@ -120,14 +169,15 @@ def generate_skip_spss_syntax(target_col, trigger_col, trigger_val, rule_type, r
     # Stage 1: Filter Flag (Flag_Qx)
     syntax.append(f"**************************************SKIP LOGIC FILTER FLAG: {trigger_col}={trigger_val} -> {target_clean}")
     syntax.append(f"* Qx should ONLY be asked if {trigger_col} = {trigger_val}.")
-    syntax.append(f"IF({trigger_col} = {trigger_val}) {filter_flag}=1.")
+    trigger_cond = get_comp_logic(trigger_col, trigger_val)
+    syntax.append(f"IF({trigger_cond}) {filter_flag}=1.")
     syntax.append(f"EXECUTE.\n") 
     
-    if rule_type == 'SQ' and range_min is not None and range_max is not None:
-        # EoO: Trigger met AND (Missing OR Out-of-Range)
-        eoo_condition = f"(miss({target_col}) | ~range({target_col},{range_min},{range_max}))"
-        # EoC: Trigger NOT met AND (Answered)
-        eoc_condition = f"~miss({target_col})" 
+     # Replace the if/elif block for eoo_condition/eoc_condition with:
+      eoo_condition = get_missing_logic(target_col)
+      if rule_type == 'SQ' and not is_string(target_col) and range_min is not None:
+      eoo_condition = f"(miss({target_col}) | ~range({target_col},{range_min},{range_max}))"
+      eoc_condition = get_answered_logic(target_col)
         
     elif rule_type == 'String':
         # EoO: Trigger met AND (Missing OR Empty String)
@@ -225,10 +275,18 @@ def generate_sq_spss_syntax(rule):
     generated_flags = []
 
     # 1. Missing/Range Check 
+# 1. Missing/Range Check (Updated for String/Numeric)
     if not rule['run_piping_check']:
         flag_name = f"{FLAG_PREFIX}{col}_Rng"
-        syntax.append(f"**************************************SQ Missing/Range Check: {col} (Range: {min_val} to {max_val})")
-        syntax.append(f"IF(miss({col}) | ~range({col},{min_val},{max_val})) {flag_name}=1.")
+        miss_logic = get_missing_logic(col) # <--- Uses the helper
+        
+        if not is_string(col):
+            # Numeric: Check missing OR range
+            syntax.append(f"IF({miss_logic} | ~range({col},{min_val},{max_val})) {flag_name}=1.")
+        else:
+            # String: Only check missing/blank (Range doesn't apply to strings)
+            syntax.append(f"IF({miss_logic}) {flag_name}=1.")
+            
         syntax.append(f"EXECUTE.\n")
         generated_flags.append(flag_name)
     
@@ -256,7 +314,8 @@ def generate_sq_spss_syntax(rule):
         # B. Generate Filter Flag (Flag_Qx)
         syntax.append(f"**************************************SQ Filter Flag for Skip/Piping: {filter_flag}")
         syntax.append(f"* Filter for {target_clean}: {trigger_col} = {trigger_val}.")
-        syntax.append(f"IF({trigger_col} = {trigger_val}) {filter_flag}=1.")
+        trigger_cond = get_comp_logic(trigger_col, trigger_val)
+        syntax.append(f"IF({trigger_cond}) {filter_flag}=1.")
         syntax.append(f"EXECUTE.\n")
         generated_flags.append(filter_flag)
         
