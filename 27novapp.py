@@ -26,8 +26,6 @@ if 'straightliner_rules' not in st.session_state:
     st.session_state.straightliner_rules = []
 if 'all_cols' not in st.session_state:
     st.session_state.all_cols = []
-    st.session_state.string_vars
-    st.session_state.numeric_vars
 
 
 for k in [
@@ -1043,6 +1041,18 @@ if uploaded_file:
         st.success(f"Loaded {len(df_raw)} rows and {len(df_raw.columns)} columns from **{uploaded_file.name}**.")
         st.session_state.all_cols = list(df_raw.columns)
         all_variable_options = ['-- Select Variable --'] + st.session_state.all_cols
+
+    # --------------------------------------------------
+# AUTO-DETECT VARIABLE TYPES (String vs Numeric)
+# --------------------------------------------------
+st.session_state.string_vars = df_raw.select_dtypes(
+    include=['object']
+).columns.tolist()
+
+st.session_state.numeric_vars = df_raw.select_dtypes(
+    exclude=['object']
+).columns.tolist()        
+
         
         st.markdown("---")
         st.header("Step 2: Define Validation Rules")
