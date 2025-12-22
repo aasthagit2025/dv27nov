@@ -33,7 +33,7 @@ keys = ['sq_rules', 'mq_rules', 'ranking_rules', 'string_rules', 'straightliner_
 for k in keys:
     if k not in st.session_state:
         st.session_state[k] = [] if k != 'var_types' else {}
-    
+
 # --- DATA LOADING FUNCTION ---
 def load_data_file(uploaded_file):
     """Reads data and automatically detects variable types and order."""
@@ -58,15 +58,18 @@ def load_data_file(uploaded_file):
         return None
 
     if df is not None:
-        # 1. PRESERVE ORDER: Store columns in the exact order they appear in the file
+        # 1. PRESERVE ORDER: Store columns exactly as they appear in the file
         st.session_state.all_cols = list(df.columns)
         
-        # 2. DETECT TYPES: Automatically identify if a variable is string or numeric
+        # 2. AUTO-DETECT TYPES: Identify if variable is string or numeric
         st.session_state.var_types = {
             col: 'string' if pd.api.types.is_string_dtype(df[col]) or pd.api.types.is_object_dtype(df[col]) else 'numeric'
             for col in df.columns
         }
     return df
+
+# --- TYPE-SENSITIVE LOGIC HELPERS ---
+
 # --- TYPE-SENSITIVE LOGIC HELPERS ---
 
 def is_string(col):
@@ -74,18 +77,21 @@ def is_string(col):
     return st.session_state.get('var_types', {}).get(col) == 'string'
 
 def get_missing_logic(col):
-    """Returns blank check for strings, miss() for numeric."""
+    """Requirement: Use blank ('') for strings and miss() for numeric."""
     if is_string(col):
         return f"({col} = '' | miss({col}))"
     return f"miss({col})"
 
 def get_answered_logic(col):
-    """Returns non-blank check for strings, ~miss() for numeric."""
+    """Requirement: Use <> '' for strings and ~miss() for numeric."""
     if is_string(col):
         return f"({col} <> '' & ~miss({col}))"
     return f"~miss({col})"
-                
-            return df
+
+def get_comp_logic(col, val):
+    """Wraps values in quotes if the variable is a string type."""
+    formatted_val = f"'{val}'" if is_string(col) else val
+    return f"{col} = {formatted_val}"
             
         except ImportError:
             st.error("Error: Reading SPSS files requires the 'pyreadstat' library. Please ensure it is in your requirements.txt.")
@@ -151,9 +157,11 @@ def generate_skip_spss_syntax(target_col, trigger_col, trigger_val, rule_type, r
     syntax.append(f"EXECUTE.\n") 
     
      # Replace the if/elif block for eoo_condition/eoc_condition with:
+   # New logic: Auto-detects type and applies correct check
       eoo_condition = get_missing_logic(target_col)
-      if rule_type == 'SQ' and not is_string(target_col) and range_min is not None:
-      eoo_condition = f"(miss({target_col}) | ~range({target_col},{range_min},{range_max}))"
+    # If it's a numeric SQ, also check the numeric range
+      if not is_string(target_col) and range_min is not None:
+      eoo_condition = f"({eoo_condition} | ~range({target_col},{range_min},{range_max}))"
       eoc_condition = get_answered_logic(target_col)
         
     elif rule_type == 'String':
@@ -239,22 +247,18 @@ def generate_sq_spss_syntax(rule):
     min_val, max_val = rule['min_val'], rule['max_val']
     syntax, generated_flags = [], []
     
-    # 1. Missing/Range Check Logic
+# 1. Missing/Range Check (Updated for Auto-Type)
     if not rule['run_piping_check']:
         flag_name = f"{FLAG_PREFIX}{col}_Rng"
-        miss_logic = get_missing_logic(col) # Uses the helper above
+        miss_logic = get_missing_logic(col)
         
         syntax.append(f"**************************************SQ Logic: {col}")
-        
         if not is_string(col):
-            # Numeric: Check for missing OR out of numeric range
+            # Numeric: Range check + Missing check
             syntax.append(f"IF({miss_logic} | ~range({col},{min_val},{max_val})) {flag_name}=1.")
         else:
-            # String: Only check if it is blank (cannot check numeric range on strings)
+            # String: Only Blank/Missing check
             syntax.append(f"IF({miss_logic}) {flag_name}=1.")
-            
-        syntax.append(f"EXECUTE.\n")
-        generated_flags.append(flag_name)
     
  
     # 2. Specific Stub Check (ANY)
