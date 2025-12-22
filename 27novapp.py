@@ -1034,7 +1034,6 @@ uploaded_file = st.file_uploader(
 )
 
 if uploaded_file:
-    try:
         # Use the new data loading function
         df_raw = load_data_file(uploaded_file)
         
@@ -1205,7 +1204,6 @@ if 'numeric_vars' not in st.session_state:
             st.warning("Please define and add at least one validation rule in Step 2.")
             
 
-    except Exception as e:
         # A clearer error message for the user after the fixes
         st.error(f"A critical error occurred during file processing or setup. Error: {e}")
         st.exception(e) # Show full traceback for debugging if needed
