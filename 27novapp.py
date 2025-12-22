@@ -1,3 +1,4 @@
+
 import streamlit as st
 import pandas as pd
 import numpy as np
@@ -1045,18 +1046,18 @@ if uploaded_file:
         f"Loaded {len(df_raw)} rows and {len(df_raw.columns)} columns from **{uploaded_file.name}**."
          )
 
-st.markdown("---")   # ← UI only, no problem at all
+        st.markdown("---")   # ← UI only, no problem at all
 
-st.session_state.all_cols = list(df_raw.columns)
+        st.session_state.all_cols = list(df_raw.columns)
 
 # --------------------------------------------------
 # AUTO-DETECT VARIABLE TYPES (String vs Numeric)
 # --------------------------------------------------
-st.session_state.string_vars = df_raw.select_dtypes(
+        st.session_state.string_vars = df_raw.select_dtypes(
     include=['object']
 ).columns.tolist()
 
-st.session_state.numeric_vars = df_raw.select_dtypes(
+        st.session_state.numeric_vars = df_raw.select_dtypes(
     exclude=['object']
 ).columns.tolist()
 
