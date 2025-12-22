@@ -41,6 +41,7 @@ for k in [
 
     
 # --- DATA LOADING FUNCTION ---
+# --- DATA LOADING FUNCTION ---
 def load_data_file(uploaded_file):
     """Reads data from CSV, Excel, or SPSS data files, handling different formats."""
     
@@ -71,16 +72,29 @@ def load_data_file(uploaded_file):
     # CORRECTED LOGIC FOR SPSS FILES (.sav, .zsav) - Uses Temporary File Path
     elif file_extension in ['.sav', '.zsav']:
         tmp_path = None
+        try:
+            # 1. Use tempfile to create a path that pd.read_spss will accept
+            # This is the most reliable way to handle the "expected str, bytes... not BytesIO" error.
+            with tempfile.NamedTemporaryFile(delete=False, suffix=file_extension) as tmp_file:
+                # 2. Write the content of the UploadedFile to the temporary file
+                tmp_file.write(uploaded_file.getbuffer())
+                tmp_path = tmp_file.name
+            
+            # 3. Read the data using the temporary file path
+            df = pd.read_spss(tmp_path, convert_categoricals=False)
+            
+            # 4. Clean up the temporary file immediately
+            os.remove(tmp_path)
 
-if file_extension in ['.sav', '.zsav']:
-    with tempfile.NamedTemporaryFile(delete=False, suffix=file_extension) as tmp_file:
-        tmp_file.write(uploaded_file.getbuffer())
-        tmp_path = tmp_file.name
-
-    df, meta = pyreadstat.read_sav(tmp_path, apply_value_formats=False)
-    os.remove(tmp_path)
-    return df
-
+# After df is created (e.g., df = pd.read_spss(...))
+    if df is not None:
+        # 1. Preserve SPSS Order: Store columns exactly as they appear in the file
+        st.session_state.all_cols = list(df.columns)
+        
+        # 2. Detect Types: Automatically identify string vs numeric
+        st.session_state.var_types = {
+            col: 'string' if pd.api.types.is_string_dtype(df[col]) or pd.api.types.is_object_dtype(df[col]) else 'numeric'
+            for col in df.columns
 
 
 # --- CORE UTILITY FUNCTIONS (SYNTAX GENERATION) ---
