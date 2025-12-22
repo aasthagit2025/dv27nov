@@ -1062,8 +1062,6 @@ if 'numeric_vars' not in st.session_state:
         .tolist()
     )
 
-
-
         all_variable_options = ['-- Select Variable --'] + st.session_state.all_cols
         
         st.markdown("---")
