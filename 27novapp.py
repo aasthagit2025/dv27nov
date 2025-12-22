@@ -71,21 +71,15 @@ def load_data_file(uploaded_file):
     # CORRECTED LOGIC FOR SPSS FILES (.sav, .zsav) - Uses Temporary File Path
     elif file_extension in ['.sav', '.zsav']:
         tmp_path = None
-            # 1. Use tempfile to create a path that pd.read_spss will accept
-            # This is the most reliable way to handle the "expected str, bytes... not BytesIO" error.
-            with tempfile.NamedTemporaryFile(delete=False, suffix=file_extension) as tmp_file:
-                # 2. Write the content of the UploadedFile to the temporary file
-                tmp_file.write(uploaded_file.getbuffer())
-                tmp_path = tmp_file.name
-            
-            # 3. Read the data using the temporary file path
-            df = pd.read_spss(tmp_path, convert_categoricals=False)
-            st.session_state['spss_var_formats'] = df.dtypes.to_dict()
-            
-            # 4. Clean up the temporary file immediately
-            os.remove(tmp_path)
-            
-            return df
+
+if file_extension in ['.sav', '.zsav']:
+    with tempfile.NamedTemporaryFile(delete=False, suffix=file_extension) as tmp_file:
+        tmp_file.write(uploaded_file.getbuffer())
+        tmp_path = tmp_file.name
+
+    df, meta = pyreadstat.read_sav(tmp_path, apply_value_formats=False)
+    os.remove(tmp_path)
+    return df
             
         except ImportError:
             st.error("Error: Reading SPSS files requires the 'pyreadstat' library. Please ensure it is in your requirements.txt.")
