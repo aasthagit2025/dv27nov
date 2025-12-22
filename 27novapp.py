@@ -83,7 +83,7 @@ def load_data_file(uploaded_file):
             df = pd.read_spss(tmp_path, convert_categoricals=False)
 
                 # ✅ STORE VARIABLE TYPES FROM SPSS
-              st.session_state['var_types'] = {col: ('string' if df[col].dtype == 'object' else 'numeric')
+            st.session_state['var_types'] = {col: ('string' if df[col].dtype == 'object' else 'numeric')
                  for col in df.columns }
  
             
