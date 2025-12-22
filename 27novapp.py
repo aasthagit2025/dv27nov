@@ -27,7 +27,6 @@ if 'straightliner_rules' not in st.session_state:
 if 'all_cols' not in st.session_state:
     st.session_state.all_cols = []
 
-
 for k in [
     'sq_rules',
     'mq_rules',
@@ -85,11 +84,6 @@ def load_data_file(uploaded_file):
             
             # 4. Clean up the temporary file immediately
             os.remove(tmp_path)
-           # ✅ STORE VARIABLE TYPES FROM SPSS
-            st.session_state['var_types'] = {
-            col: ('string' if df[col].dtype == 'object' else 'numeric')
-            for col in df.columns
-            }
             
             return df
             
@@ -1039,20 +1033,8 @@ if uploaded_file:
         df_raw = load_data_file(uploaded_file)
         
         st.success(f"Loaded {len(df_raw)} rows and {len(df_raw.columns)} columns from **{uploaded_file.name}**.")
-        st.session_state.all_cols = list(df_raw.columns)
+        st.session_state.all_cols = list(df_raw.columns.tolist())
         all_variable_options = ['-- Select Variable --'] + st.session_state.all_cols
-
-    # --------------------------------------------------
-# AUTO-DETECT VARIABLE TYPES (String vs Numeric)
-# --------------------------------------------------
-st.session_state.string_vars = df_raw.select_dtypes(
-    include=['object']
-).columns.tolist()
-
-st.session_state.numeric_vars = df_raw.select_dtypes(
-    exclude=['object']
-).columns.tolist()        
-
         
         st.markdown("---")
         st.header("Step 2: Define Validation Rules")
