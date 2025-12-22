@@ -36,77 +36,54 @@ for k in keys:
     
 # --- DATA LOADING FUNCTION ---
 def load_data_file(uploaded_file):
-    """Reads data from CSV, Excel, or SPSS data files, handling different formats."""
-    
+    """Reads data and automatically detects variable types and order."""
     file_extension = os.path.splitext(uploaded_file.name)[1].lower()
-    
-    # Define NA values for CSV/Excel
     na_values = ['', ' ', '#N/A', 'N/A', 'NA', '#NA', 'NULL', 'null']
+    df = None
     
-    if file_extension in ['.csv']:
-        # Try common encodings for CSV
-        try:
-            # Attempt UTF-8 first
-            uploaded_file.seek(0) # Ensure pointer is at start
-            return pd.read_csv(uploaded_file, encoding='utf-8', na_values=na_values, keep_default_na=True)
-        except Exception:
-            try:
-                # Reset file pointer and try Latin-1
-                uploaded_file.seek(0)
-                return pd.read_csv(uploaded_file, encoding='latin-1', na_values=na_values, keep_default_na=True)
-            except Exception as e:
-                raise Exception(f"Failed to read CSV with both UTF-8 and Latin-1 encodings. Error: {e}")
-    
-    elif file_extension in ['.xlsx', '.xls']:
-        # Excel files
-        uploaded_file.seek(0) # Ensure pointer is at start
-        return pd.read_excel(uploaded_file)
-    
-    # CORRECTED LOGIC FOR SPSS FILES (.sav, .zsav) - Uses Temporary File Path
-    elif file_extension in ['.sav', '.zsav']:
-        tmp_path = None
-        try:
-            # 1. Use tempfile to create a path that pd.read_spss will accept
-            # This is the most reliable way to handle the "expected str, bytes... not BytesIO" error.
+    try:
+        if file_extension == '.csv':
+            uploaded_file.seek(0)
+            df = pd.read_csv(uploaded_file, encoding='utf-8', na_values=na_values)
+        elif file_extension in ['.xlsx', '.xls']:
+            df = pd.read_excel(uploaded_file)
+        elif file_extension in ['.sav', '.zsav']:
             with tempfile.NamedTemporaryFile(delete=False, suffix=file_extension) as tmp_file:
-                # 2. Write the content of the UploadedFile to the temporary file
                 tmp_file.write(uploaded_file.getbuffer())
                 tmp_path = tmp_file.name
-            
-            # 3. Read the data using the temporary file path
             df = pd.read_spss(tmp_path, convert_categoricals=False)
-            
-            # 4. Clean up the temporary file immediately
             os.remove(tmp_path)
+    except Exception as e:
+        st.error(f"Error loading file: {e}")
+        return None
 
-# After df is created (e.g., df = pd.read_spss(...))
     if df is not None:
-        # 1. Preserve SPSS Order: Store columns exactly as they appear in the file
+        # 1. PRESERVE ORDER: Store columns in the exact order they appear in the file
         st.session_state.all_cols = list(df.columns)
         
-        # 2. Detect Types: Automatically identify string vs numeric
+        # 2. DETECT TYPES: Automatically identify if a variable is string or numeric
         st.session_state.var_types = {
             col: 'string' if pd.api.types.is_string_dtype(df[col]) or pd.api.types.is_object_dtype(df[col]) else 'numeric'
             for col in df.columns
-
+        }
+    return df
 # --- TYPE-SENSITIVE LOGIC HELPERS ---
 
 def is_string(col):
-    """Checks if a variable is a string type based on auto-detection."""
+    """Checks if a column is detected as a string."""
     return st.session_state.get('var_types', {}).get(col) == 'string'
 
 def get_missing_logic(col):
-    """Uses blank ('') for strings and miss() for numeric."""
+    """Returns blank check for strings, miss() for numeric."""
     if is_string(col):
         return f"({col} = '' | miss({col}))"
     return f"miss({col})"
 
 def get_answered_logic(col):
-    """Uses <> '' for strings and ~miss() for numeric."""
+    """Returns non-blank check for strings, ~miss() for numeric."""
     if is_string(col):
         return f"({col} <> '' & ~miss({col}))"
     return f"~miss({col})"
-        }
                 
             return df
             
@@ -258,38 +235,28 @@ def generate_piping_spss_syntax(target_col, overall_skip_filter_flag, piping_sou
 
 
 def generate_sq_spss_syntax(rule):
-    """Generates detailed SPSS syntax for a single Single Select check."""
     col = rule['variable']
-    min_val = rule['min_val']
-    max_val = rule['max_val']
-    required_stubs_list = rule['required_stubs']
+    min_val, max_val = rule['min_val'], rule['max_val']
+    syntax, generated_flags = [], []
     
-    if '_' in col:
-        target_clean = col.split('_')[0]
-    else:
-        target_clean = col
-        
-    filter_flag = f"Flag_{target_clean}" 
-        
-    syntax = []
-    generated_flags = []
-
-    # 1. Missing/Range Check 
-# 1. Missing/Range Check (Updated for String/Numeric)
+    # 1. Missing/Range Check Logic
     if not rule['run_piping_check']:
         flag_name = f"{FLAG_PREFIX}{col}_Rng"
-        miss_logic = get_missing_logic(col) # <--- Uses the helper
+        miss_logic = get_missing_logic(col) # Uses the helper above
+        
+        syntax.append(f"**************************************SQ Logic: {col}")
         
         if not is_string(col):
-            # Numeric: Check missing OR range
+            # Numeric: Check for missing OR out of numeric range
             syntax.append(f"IF({miss_logic} | ~range({col},{min_val},{max_val})) {flag_name}=1.")
         else:
-            # String: Only check missing/blank (Range doesn't apply to strings)
+            # String: Only check if it is blank (cannot check numeric range on strings)
             syntax.append(f"IF({miss_logic}) {flag_name}=1.")
             
         syntax.append(f"EXECUTE.\n")
         generated_flags.append(flag_name)
     
+ 
     # 2. Specific Stub Check (ANY)
     if required_stubs_list:
         stubs_str = ', '.join(map(str, required_stubs_list))
