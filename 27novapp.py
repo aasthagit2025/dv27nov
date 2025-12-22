@@ -1041,9 +1041,9 @@ if uploaded_file:
         st.session_state.all_cols = list(df_raw.columns.tolist())
         df_raw = load_data_file(uploaded_file)
 
-st.success(
-    f"Loaded {len(df_raw)} rows and {len(df_raw.columns)} columns from **{uploaded_file.name}**."
-)
+        st.success(
+        f"Loaded {len(df_raw)} rows and {len(df_raw.columns)} columns from **{uploaded_file.name}**."
+         )
 
 st.markdown("---")   # ← UI only, no problem at all
 
