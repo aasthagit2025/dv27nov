@@ -1039,7 +1039,28 @@ if uploaded_file:
         
         st.success(f"Loaded {len(df_raw)} rows and {len(df_raw.columns)} columns from **{uploaded_file.name}**.")
         st.session_state.all_cols = list(df_raw.columns.tolist())
-        all_variable_options = ['-- Select Variable --'] + st.session_state.all_cols
+        df_raw = load_data_file(uploaded_file)
+
+st.success(
+    f"Loaded {len(df_raw)} rows and {len(df_raw.columns)} columns from **{uploaded_file.name}**."
+)
+
+st.markdown("---")   # ← UI only, no problem at all
+
+st.session_state.all_cols = list(df_raw.columns)
+
+# --------------------------------------------------
+# AUTO-DETECT VARIABLE TYPES (String vs Numeric)
+# --------------------------------------------------
+st.session_state.string_vars = df_raw.select_dtypes(
+    include=['object']
+).columns.tolist()
+
+st.session_state.numeric_vars = df_raw.select_dtypes(
+    exclude=['object']
+).columns.tolist()
+
+all_variable_options = ['-- Select Variable --'] + st.session_state.all_cols
         
         st.markdown("---")
         st.header("Step 2: Define Validation Rules")
