@@ -100,7 +100,6 @@ def load_data_file(uploaded_file):
         raise Exception(f"Unsupported file format: {file_extension}. Please upload CSV, Excel (.xlsx/.xls), or SPSS (.sav/.zsav).")
 
 
-
 # --- CORE UTILITY FUNCTIONS (SYNTAX GENERATION) ---
 
 def generate_skip_spss_syntax(target_col, trigger_col, trigger_val, rule_type, range_min=None, range_max=None):
@@ -131,9 +130,10 @@ def generate_skip_spss_syntax(target_col, trigger_col, trigger_val, rule_type, r
         eoc_condition = f"~miss({target_col})" 
         
     elif rule_type == 'String':
-        # String variables: BLANK only (no miss())
-        eoo_condition = f"({target_col}='')"
-        eoc_condition = f"({target_col}<>'')" 
+        # EoO: Trigger met AND (Missing OR Empty String)
+        eoo_condition = f"({target_col}='' | miss({target_col}))"
+        # EoC: Trigger NOT met AND (Not Missing AND Not Empty)
+        eoc_condition = f"({target_col}<>'' & ~miss({target_col}))" 
         
     else: # MQ/Ranking/General
         eoo_condition = f"miss({target_col})"
@@ -171,7 +171,7 @@ def generate_other_specify_spss_syntax(main_col, other_col, other_stub_val):
     # Forward Check (Main selected, Other is empty/missing) - EoO type check
     syntax.append(f"**************************************OTHER SPECIFY (Forward) Check: {main_col}={other_stub_val} AND {other_col} is missing/blank")
     syntax.append(f"* EoO (1): Main selected ({main_col}={other_stub_val}), Other is missing/blank.")
-    syntax.append(f"IF({main_col}={other_stub_val} & {other_col}='') {flag_name_fwd}=1.")
+    syntax.append(f"IF({main_col}={other_stub_val} & ({other_col}='' | miss({other_col}))) {flag_name_fwd}=1.")
     syntax.append(f"EXECUTE.\n")
     
     # Reverse Check (Other answered, Main not selected) - EoC type check
@@ -642,7 +642,7 @@ def generate_string_spss_syntax(rule):
         flag_missing = f"{FLAG_PREFIX}{col}_Miss"
         syntax.append(f"**************************************String Missing Check: {col} (Missing Mandatory Check)")
         # Flag 1 if missing or empty string
-        syntax.append(f"IF({col}='') {flag_missing}=1.")
+        syntax.append(f"IF({col}='' | miss({col})) {flag_missing}=1.")
         syntax.append(f"EXECUTE.\n")
         generated_flags.append(flag_missing)
         
@@ -1028,12 +1028,12 @@ uploaded_file = st.file_uploader(
 )
 
 if uploaded_file:
-
+    try:
         # Use the new data loading function
         df_raw = load_data_file(uploaded_file)
         
         st.success(f"Loaded {len(df_raw)} rows and {len(df_raw.columns)} columns from **{uploaded_file.name}**.")
-        st.session_state.all_cols = list(df_raw.columns)
+        st.session_state.all_cols = sorted(df_raw.columns.tolist())
         all_variable_options = ['-- Select Variable --'] + st.session_state.all_cols
         
         st.markdown("---")
@@ -1173,6 +1173,8 @@ if uploaded_file:
         else:
             st.warning("Please define and add at least one validation rule in Step 2.")
             
+
+    except Exception as e:
         # A clearer error message for the user after the fixes
         st.error(f"A critical error occurred during file processing or setup. Error: {e}")
         st.exception(e) # Show full traceback for debugging if needed
