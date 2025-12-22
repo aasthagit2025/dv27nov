@@ -71,7 +71,6 @@ def load_data_file(uploaded_file):
     # CORRECTED LOGIC FOR SPSS FILES (.sav, .zsav) - Uses Temporary File Path
     elif file_extension in ['.sav', '.zsav']:
         tmp_path = None
-        try:
             # 1. Use tempfile to create a path that pd.read_spss will accept
             # This is the most reliable way to handle the "expected str, bytes... not BytesIO" error.
             with tempfile.NamedTemporaryFile(delete=False, suffix=file_extension) as tmp_file:
