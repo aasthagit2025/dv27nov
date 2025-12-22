@@ -41,7 +41,6 @@ for k in [
 
     
 # --- DATA LOADING FUNCTION ---
-# --- DATA LOADING FUNCTION ---
 def load_data_file(uploaded_file):
     """Reads data from CSV, Excel, or SPSS data files, handling different formats."""
     
@@ -85,16 +84,21 @@ def load_data_file(uploaded_file):
             
             # 4. Clean up the temporary file immediately
             os.remove(tmp_path)
+            
+            return df
+            
+        except ImportError:
+            st.error("Error: Reading SPSS files requires the 'pyreadstat' library. Please ensure it is in your requirements.txt.")
+            raise
+        except Exception as e:
+            # Ensure file is removed if an error occurred during read
+            if tmp_path and os.path.exists(tmp_path):
+                os.remove(tmp_path)
+            raise Exception(f"Failed to read SPSS data file. Please ensure it is a valid .sav or .zsav file. Error: {e}")
+    
+    else:
+        raise Exception(f"Unsupported file format: {file_extension}. Please upload CSV, Excel (.xlsx/.xls), or SPSS (.sav/.zsav).")
 
-# After df is created (e.g., df = pd.read_spss(...))
-    if df is not None:
-        # 1. Preserve SPSS Order: Store columns exactly as they appear in the file
-        st.session_state.all_cols = list(df.columns)
-        
-        # 2. Detect Types: Automatically identify string vs numeric
-        st.session_state.var_types = {
-            col: 'string' if pd.api.types.is_string_dtype(df[col]) or pd.api.types.is_object_dtype(df[col]) else 'numeric'
-            for col in df.columns
 
 
 # --- CORE UTILITY FUNCTIONS (SYNTAX GENERATION) ---
