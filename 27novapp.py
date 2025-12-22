@@ -1173,8 +1173,6 @@ if uploaded_file:
         else:
             st.warning("Please define and add at least one validation rule in Step 2.")
             
-
-    except Exception as e:
         # A clearer error message for the user after the fixes
         st.error(f"A critical error occurred during file processing or setup. Error: {e}")
         st.exception(e) # Show full traceback for debugging if needed
