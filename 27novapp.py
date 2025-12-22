@@ -1033,7 +1033,7 @@ if uploaded_file:
         df_raw = load_data_file(uploaded_file)
         
         st.success(f"Loaded {len(df_raw)} rows and {len(df_raw.columns)} columns from **{uploaded_file.name}**.")
-        st.session_state.all_cols = sorted(df_raw.columns.tolist())
+        st.session_state.all_cols = list(df_raw.columns)
         all_variable_options = ['-- Select Variable --'] + st.session_state.all_cols
         
         st.markdown("---")
