@@ -80,18 +80,7 @@ if file_extension in ['.sav', '.zsav']:
     df, meta = pyreadstat.read_sav(tmp_path, apply_value_formats=False)
     os.remove(tmp_path)
     return df
-            
-        except ImportError:
-            st.error("Error: Reading SPSS files requires the 'pyreadstat' library. Please ensure it is in your requirements.txt.")
-            raise
-        except Exception as e:
-            # Ensure file is removed if an error occurred during read
-            if tmp_path and os.path.exists(tmp_path):
-                os.remove(tmp_path)
-            raise Exception(f"Failed to read SPSS data file. Please ensure it is a valid .sav or .zsav file. Error: {e}")
-    
-    else:
-        raise Exception(f"Unsupported file format: {file_extension}. Please upload CSV, Excel (.xlsx/.xls), or SPSS (.sav/.zsav).")
+
 
 
 # --- CORE UTILITY FUNCTIONS (SYNTAX GENERATION) ---
