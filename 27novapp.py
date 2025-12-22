@@ -26,6 +26,9 @@ if 'straightliner_rules' not in st.session_state:
     st.session_state.straightliner_rules = []
 if 'all_cols' not in st.session_state:
     st.session_state.all_cols = []
+    st.session_state.string_vars
+    st.session_state.numeric_vars
+
 
 for k in [
     'sq_rules',
@@ -84,6 +87,11 @@ def load_data_file(uploaded_file):
             
             # 4. Clean up the temporary file immediately
             os.remove(tmp_path)
+           # ✅ STORE VARIABLE TYPES FROM SPSS
+            st.session_state['var_types'] = {
+            col: ('string' if df[col].dtype == 'object' else 'numeric')
+            for col in df.columns
+            }
             
             return df
             
