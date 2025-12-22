@@ -1028,7 +1028,7 @@ uploaded_file = st.file_uploader(
 )
 
 if uploaded_file:
-    try:
+
         # Use the new data loading function
         df_raw = load_data_file(uploaded_file)
         
