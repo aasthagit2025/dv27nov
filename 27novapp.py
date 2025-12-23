@@ -108,67 +108,57 @@ st.session_state.var_types = {
 # --- CORE UTILITY FUNCTIONS (SYNTAX GENERATION) ---
 
 def generate_skip_spss_syntax(target_col, trigger_col, trigger_val, rule_type, range_min=None, range_max=None):
-    """
-    Generates detailed SPSS syntax for Skip Logic (Error of Omission/Commission)
-    using the two-stage process: Flag_Qx (intermediate filter) -> xxQx (final EoO/EoC flag).
-    """
+
     if '_' in target_col:
         target_clean = target_col.split('_')[0]
     else:
         target_clean = target_col
-        
-    filter_flag = f"Flag_{target_clean}" 
-    final_error_flag = f"{FLAG_PREFIX}{target_clean}" 
-    
+
+    filter_flag = f"Flag_{target_clean}"
+    final_error_flag = f"{FLAG_PREFIX}{target_clean}"
+
     syntax = []
+
     # --- Variable type detection ---
     target_is_string = st.session_state.var_types.get(target_col) == 'string'
     trigger_is_string = st.session_state.var_types.get(trigger_col) == 'string'
 
-    
-    # Stage 1: Filter Flag (Flag_Qx)
-    syntax.append(f"**************************************SKIP LOGIC FILTER FLAG: {trigger_col}={trigger_val} -> {target_clean}")
-    syntax.append(f"* Qx should ONLY be asked if {trigger_col} = {trigger_val}.")
-if trigger_is_string:
-     trigger_condition = f"{trigger_col}<>''"
-else:
-     trigger_condition = f"{trigger_col} = {trigger_val}"
-     syntax.append(f"IF({trigger_condition}) {filter_flag}=1.")
+    # -------------------------------
+    # A. FILTER FLAG (WHEN QUESTION SHOULD BE ASKED)
+    # -------------------------------
+    if trigger_is_string:
+        trigger_condition = f"{trigger_col}<>''"
+    else:
+        trigger_condition = f"{trigger_col}={trigger_val}"
 
-     syntax.append(f"EXECUTE.\n") 
-    
-if rule_type == 'SQ' and range_min is not None and range_max is not None:
-        # EoO: Trigger met AND (Missing OR Out-of-Range)
-        eoo_condition = f"(miss({target_col}) | ~range({target_col},{range_min},{range_max}))"
-        # EoC: Trigger NOT met AND (Answered)
-        eoc_condition = f"~miss({target_col})" 
-if target_is_string:
-    # STRING TARGET (OE / Other Specify)
-    eoo_condition = f"{target_col}=''"
-    eoc_condition = f"{target_col}<>''"
-else:
-    # NUMERIC TARGET
-    eoo_condition = f"miss({target_col})"
-    eoc_condition = f"~miss({target_col})"
+    syntax.append(f"**************************************SKIP LOGIC FILTER FLAG")
+    syntax.append(f"IF({trigger_condition}) {filter_flag}=1.")
+    syntax.append("EXECUTE.\n")
 
-else: 
-    # MQ/Ranking/General
-    eoo_condition = f"miss({target_col})"
-    eoc_condition = f"~miss({target_col})" 
-        
-    # --- EoO/EoC Logic ---
-     syntax.append(f"**************************************SKIP LOGIC EoO/EoC CHECK: {target_col} -> {final_error_flag}")
-    
-    # Error of Omission (EoO) - Flag=1
-     syntax.append(f"* EoO (1): Trigger Met ({filter_flag}=1), Target Fails Check/Missing/Out-of-Range/Empty.")
-     syntax.append(f"IF({filter_flag} = 1 & {eoo_condition}) {final_error_flag}=1.")
-    
-    # Error of Commission (EoC) - Flag=2
-     syntax.append(f"* EoC (2): Trigger Not Met ({filter_flag}<>1 | miss({filter_flag})), Target Answered.")
-     syntax.append(f"IF(({filter_flag} <> 1 | miss({filter_flag})) & {eoc_condition}) {final_error_flag}=2.")
-    
-     syntax.append("EXECUTE.\n")
-    
+    # -------------------------------
+    # B. EOO / EOC CONDITIONS
+    # -------------------------------
+    if target_is_string:
+        # STRING TARGET (OE / Other Specify)
+        eoo_condition = f"{target_col}=''"
+        eoc_condition = f"{target_col}<>''"
+    else:
+        # NUMERIC TARGET
+        if rule_type == 'SQ' and range_min is not None and range_max is not None:
+            eoo_condition = f"(miss({target_col}) | ~range({target_col},{range_min},{range_max}))"
+            eoc_condition = f"~miss({target_col})"
+        else:
+            eoo_condition = f"miss({target_col})"
+            eoc_condition = f"~miss({target_col})"
+
+    # -------------------------------
+    # C. FINAL EOO / EOC FLAGS
+    # -------------------------------
+    syntax.append(f"**************************************SKIP LOGIC EoO/EoC CHECK")
+    syntax.append(f"IF({filter_flag}=1 & {eoo_condition}) {final_error_flag}=1.")
+    syntax.append(f"IF(({filter_flag}<>1 | miss({filter_flag})) & {eoc_condition}) {final_error_flag}=2.")
+    syntax.append("EXECUTE.\n")
+
     return syntax, [filter_flag, final_error_flag]
 
 
