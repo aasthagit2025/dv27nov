@@ -681,9 +681,9 @@ def configure_string_rules(all_variable_options):
     )
 
 # 🔒 GUARD: do not show OE UI if nothing is selected
-if not selected:
-    st.info("Please select at least one Open-End (OE) variable to configure.")
-    return
+    if not selected:
+       st.info("Please select at least one Open-End (OE) variable to configure.")
+       return
 
     if st.button("Configure OE"):
         st.session_state.string_batch_vars = selected
