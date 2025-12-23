@@ -134,7 +134,7 @@ if trigger_is_string:
 else:
     trigger_condition = f"{trigger_col} = {trigger_val}"
 
-syntax.append(f"IF({trigger_condition}) {filter_flag}=1.")
+    syntax.append(f"IF({trigger_condition}) {filter_flag}=1.")
 
     syntax.append(f"EXECUTE.\n") 
     
