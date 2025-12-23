@@ -1050,6 +1050,20 @@ if uploaded_file:
         st.session_state.all_cols = list(df_raw.columns.tolist())
         all_variable_options = ['-- Select Variable --'] + st.session_state.all_cols
 
+        st.markdown("## Step 2: Configure Validation Rules")
+
+        active_step = st.radio(
+           "Select configuration step",
+            [
+              "Single Select (SQ)",
+              "Straightliner",
+              "Multi Select (MQ)",
+              "Open End (OE)"
+            ],
+            horizontal=True
+       )
+
+
         # ✅ Variable type detection (STRING vs NUMERIC)
         st.session_state.var_types = {
             col: ('string' if df_raw[col].dtype == object else 'numeric')
@@ -1077,14 +1091,17 @@ if uploaded_file:
 
 
         # New Configuration UIs
-        configure_sq_rules(all_variable_options)
-        st.markdown("---")
-        configure_straightliner_rules()
-        st.markdown("---")
-        configure_mq_rules(all_variable_options)
-        st.markdown("---")
-        configure_string_rules(all_variable_options)
-        st.markdown("---")
+if active_step == "Single Select (SQ)":
+    configure_sq_rules(all_variable_options)
+
+elif active_step == "Straightliner":
+    configure_straightliner_rules()
+
+elif active_step == "Multi Select (MQ)":
+    configure_mq_rules(all_variable_options)
+
+elif active_step == "Open End (OE)":
+    configure_string_rules(all_variable_options)
 
         st.header("Step 3: Generate Master Syntax")
         
