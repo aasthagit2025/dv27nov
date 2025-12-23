@@ -1065,8 +1065,8 @@ if 'numeric_vars' not in st.session_state:
        
 all_variable_options = ['-- Select Variable --'] + st.session_state.all_cols
         
-    st.markdown("---")
-    st.header("Step 2: Define Validation Rules")
+        st.markdown("---")
+        st.header("Step 2: Define Validation Rules")
         
         col_side_a, col_side_b = st.sidebar.columns(2)
         with col_side_a:
