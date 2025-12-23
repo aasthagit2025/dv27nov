@@ -99,6 +99,11 @@ def load_data_file(uploaded_file):
     else:
         raise Exception(f"Unsupported file format: {file_extension}. Please upload CSV, Excel (.xlsx/.xls), or SPSS (.sav/.zsav).")
 
+st.session_state.var_types = {
+    col: ('string' if df_raw[col].dtype == object else 'numeric')
+    for col in df_raw.columns
+}
+
 
 # --- CORE UTILITY FUNCTIONS (SYNTAX GENERATION) ---
 
@@ -116,11 +121,21 @@ def generate_skip_spss_syntax(target_col, trigger_col, trigger_val, rule_type, r
     final_error_flag = f"{FLAG_PREFIX}{target_clean}" 
     
     syntax = []
+    # --- Variable type detection ---
+    target_is_string = st.session_state.var_types.get(target_col) == 'string'
+    trigger_is_string = st.session_state.var_types.get(trigger_col) == 'string'
+
     
     # Stage 1: Filter Flag (Flag_Qx)
     syntax.append(f"**************************************SKIP LOGIC FILTER FLAG: {trigger_col}={trigger_val} -> {target_clean}")
     syntax.append(f"* Qx should ONLY be asked if {trigger_col} = {trigger_val}.")
-    syntax.append(f"IF({trigger_col} = {trigger_val}) {filter_flag}=1.")
+if trigger_is_string:
+    trigger_condition = f"{trigger_col}<>''"
+else:
+    trigger_condition = f"{trigger_col} = {trigger_val}"
+
+syntax.append(f"IF({trigger_condition}) {filter_flag}=1.")
+
     syntax.append(f"EXECUTE.\n") 
     
     if rule_type == 'SQ' and range_min is not None and range_max is not None:
@@ -256,7 +271,13 @@ def generate_sq_spss_syntax(rule):
         # B. Generate Filter Flag (Flag_Qx)
         syntax.append(f"**************************************SQ Filter Flag for Skip/Piping: {filter_flag}")
         syntax.append(f"* Filter for {target_clean}: {trigger_col} = {trigger_val}.")
-        syntax.append(f"IF({trigger_col} = {trigger_val}) {filter_flag}=1.")
+        if trigger_is_string:
+    trigger_condition = f"{trigger_col}<>''"
+else:
+    trigger_condition = f"{trigger_col} = {trigger_val}"
+
+syntax.append(f"IF({trigger_condition}) {filter_flag}=1.")
+
         syntax.append(f"EXECUTE.\n")
         generated_flags.append(filter_flag)
         
