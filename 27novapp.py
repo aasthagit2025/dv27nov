@@ -144,11 +144,15 @@ if rule_type == 'SQ' and range_min is not None and range_max is not None:
         eoc_condition = f"~miss({target_col})" 
         
 elif rule_type == 'String':
-        # EoO: Trigger met AND (Missing OR Empty String)
-        eoo_condition = f"({target_col}='' | miss({target_col}))"
-        # EoC: Trigger NOT met AND (Not Missing AND Not Empty)
-        eoc_condition = f"({target_col}<>'' & ~miss({target_col}))" 
-        
+if target_is_string:
+    # STRING TARGET (OE / Other Specify)
+    eoo_condition = f"{target_col}=''"
+    eoc_condition = f"{target_col}<>''"
+else:
+    # NUMERIC TARGET
+    eoo_condition = f"miss({target_col})"
+    eoc_condition = f"~miss({target_col})"
+
 else: # MQ/Ranking/General
         eoo_condition = f"miss({target_col})"
         eoc_condition = f"~miss({target_col})" 
