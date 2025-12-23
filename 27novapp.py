@@ -1032,73 +1032,82 @@ uploaded_file = st.file_uploader(
     "Choose a Survey Data File", 
     type=['csv', 'xlsx', 'xls', 'sav', 'zsav'] 
 )
+# ===============================
+# MAIN APP FLOW (FINAL & SAFE)
+# ===============================
 
 if uploaded_file:
-        # Use the new data loading function
-        df_raw = load_data_file(uploaded_file)
-        
-        st.success(f"Loaded {len(df_raw)} rows and {len(df_raw.columns)} columns from **{uploaded_file.name}**.")
-        st.session_state.all_cols = list(df_raw.columns.tolist())
-       
 
-        st.markdown("---")   # ← UI only, no problem at all
+    # 1. Load data ONCE
+    df_raw = load_data_file(uploaded_file)
 
-        st.session_state.all_cols = list(df_raw.columns)
-
-# --------------------------------------------------
-# AUTO-DETECT VARIABLE TYPES (String vs Numeric)
-# --------------------------------------------------
-if 'string_vars' not in st.session_state:
-    st.session_state.string_vars = (
-        df_raw.select_dtypes(include=['object'])
-        .columns
-        .tolist()
+    st.success(
+        f"Loaded {len(df_raw)} rows and {len(df_raw.columns)} columns from **{uploaded_file.name}**."
     )
 
-if 'numeric_vars' not in st.session_state:
-    st.session_state.numeric_vars = (
-        df_raw.select_dtypes(exclude=['object'])
-        .columns
-        .tolist()
-    )
+    # 2. Preserve SPSS variable order
+    st.session_state.all_cols = list(df_raw.columns)
 
-       
-all_variable_options = ['-- Select Variable --'] + st.session_state.all_cols
-        
+    # 3. Auto-detect variable types (run once)
+    if 'string_vars' not in st.session_state:
+        st.session_state.string_vars = (
+            df_raw.select_dtypes(include=['object'])
+            .columns
+            .tolist()
+        )
+
+    if 'numeric_vars' not in st.session_state:
+        st.session_state.numeric_vars = (
+            df_raw.select_dtypes(exclude=['object'])
+            .columns
+            .tolist()
+        )
+
+    # 4. Build dropdown options
+    all_variable_options = ['-- Select Variable --'] + st.session_state.all_cols
     st.markdown("---")
     st.header("Step 2: Define Validation Rules")
-        
-        col_side_a, col_side_b = st.sidebar.columns(2)
-        with col_side_a:
-            st.sidebar.button("🗑️ Clear All Rules", on_click=clear_all_rules)
-        with col_side_b:
-            total_rules = len(st.session_state.sq_rules) + len(st.session_state.mq_rules) + len(st.session_state.ranking_rules) + len(st.session_state.string_rules) + len(st.session_state.straightliner_rules)
-            st.sidebar.markdown(f"**Total Rules:** {total_rules}")
-        
-        # Display existing rules
-        display_rules(st.session_state.sq_rules, ['variable'], "Current 1. Single Select (SQ) / Rating Rules", 'sq')
-        display_rules(st.session_state.straightliner_rules, ['variables'], "Current 2. Straightliner (Grid) Rules", 'straightliner')
-        display_rules(st.session_state.mq_rules, ['variables'], "Current 3. Multi-Select (MQ) Rules", 'mq')
-        # Ranking Configuration is omitted for brevity but the generator is present
-        # display_rules(st.session_state.ranking_rules, ['variables'], "Current Ranking Rules", 'ranking')
-        display_rules(st.session_state.string_rules, ['variable'], "Current 4. String/OE Rules", 'string')
 
+    # 5. Rule configuration (MUST be inside upload block)
+    configure_sq_rules(all_variable_options)
+    st.markdown("---")
 
-        # New Configuration UIs
-        configure_sq_rules(all_variable_options)
-        st.markdown("---")
-        configure_straightliner_rules()
-        st.markdown("---")
-        configure_mq_rules(all_variable_options)
-        st.markdown("---")
-        configure_string_rules(all_variable_options)
-        st.markdown("---")
+    configure_mq_rules(all_variable_options)
+    st.markdown("---")
 
-        st.header("Step 3: Generate Master Syntax")
+    configure_string_rules(all_variable_options)
+    st.markdown("---")
+
+    # 6. Generate syntax
+    st.header("Step 3: Generate Master Syntax")
+
+    total_rules = (
+        len(st.session_state.sq_rules)
+        + len(st.session_state.mq_rules)
+        + len(st.session_state.ranking_rules)
+        + len(st.session_state.string_rules)
+        + len(st.session_state.straightliner_rules)
+    )
+
+    if total_rules > 0:
+        master_spss_syntax = generate_master_spss_syntax(
+            st.session_state.sq_rules,
+            st.session_state.mq_rules,
+            st.session_state.ranking_rules,
+            st.session_state.string_rules,
+            st.session_state.straightliner_rules
+        )
+
+        st.download_button(
+            "⬇️ Download Master SPSS Syntax",
+            master_spss_syntax,
+            file_name="master_validation_script.sps"
+        )
+
+st.header("Step 3: Generate Master Syntax")       
+total_rules = len(st.session_state.sq_rules) + len(st.session_state.mq_rules) + len(st.session_state.ranking_rules) + len(st.session_state.string_rules) + len(st.session_state.straightliner_rules)
         
-        total_rules = len(st.session_state.sq_rules) + len(st.session_state.mq_rules) + len(st.session_state.ranking_rules) + len(st.session_state.string_rules) + len(st.session_state.straightliner_rules)
-        
-        if total_rules > 0:
+if total_rules > 0:
             
             # --- Generate Master Outputs ---
             master_spss_syntax = generate_master_spss_syntax(
@@ -1199,7 +1208,7 @@ all_variable_options = ['-- Select Variable --'] + st.session_state.all_cols
             
             st.code(preview_text + "\n\n*(...Download the .sps file for the complete detailed syntax)*", language='spss')
             
-        else:
+else:
             st.warning("Please define and add at least one validation rule in Step 2.")
             
 
