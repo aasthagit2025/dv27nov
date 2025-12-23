@@ -142,8 +142,7 @@ if rule_type == 'SQ' and range_min is not None and range_max is not None:
         eoo_condition = f"(miss({target_col}) | ~range({target_col},{range_min},{range_max}))"
         # EoC: Trigger NOT met AND (Answered)
         eoc_condition = f"~miss({target_col})" 
-        
- if target_is_string:
+if target_is_string:
     # STRING TARGET (OE / Other Specify)
     eoo_condition = f"{target_col}=''"
     eoc_condition = f"{target_col}<>''"
