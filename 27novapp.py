@@ -146,12 +146,12 @@ if target_is_string:
     # STRING TARGET (OE / Other Specify)
     eoo_condition = f"{target_col}=''"
     eoc_condition = f"{target_col}<>''"
- else:
+else:
     # NUMERIC TARGET
     eoo_condition = f"miss({target_col})"
     eoc_condition = f"~miss({target_col})"
 
- else: # MQ/Ranking/General
+else: # MQ/Ranking/General
         eoo_condition = f"miss({target_col})"
         eoc_condition = f"~miss({target_col})" 
         
