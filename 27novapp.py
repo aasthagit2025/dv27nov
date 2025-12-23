@@ -130,13 +130,12 @@ def generate_skip_spss_syntax(target_col, trigger_col, trigger_val, rule_type, r
     syntax.append(f"**************************************SKIP LOGIC FILTER FLAG: {trigger_col}={trigger_val} -> {target_clean}")
     syntax.append(f"* Qx should ONLY be asked if {trigger_col} = {trigger_val}.")
 if trigger_is_string:
-    trigger_condition = f"{trigger_col}<>''"
+     trigger_condition = f"{trigger_col}<>''"
 else:
-    trigger_condition = f"{trigger_col} = {trigger_val}"
+     trigger_condition = f"{trigger_col} = {trigger_val}"
+     syntax.append(f"IF({trigger_condition}) {filter_flag}=1.")
 
-    syntax.append(f"IF({trigger_condition}) {filter_flag}=1.")
-
-    syntax.append(f"EXECUTE.\n") 
+     syntax.append(f"EXECUTE.\n") 
     
     if rule_type == 'SQ' and range_min is not None and range_max is not None:
         # EoO: Trigger met AND (Missing OR Out-of-Range)
