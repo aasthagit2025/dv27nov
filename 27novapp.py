@@ -1,3 +1,4 @@
+
 import streamlit as st
 import pandas as pd
 import numpy as np
@@ -83,7 +84,7 @@ def load_data_file(uploaded_file):
             df = pd.read_spss(tmp_path, convert_categoricals=False)
 
                 # ✅ STORE VARIABLE TYPES FROM SPSS
-              st.session_state['var_types'] = {col: ('string' if df[col].dtype == 'object' else 'numeric')
+            st.session_state['var_types'] = {col: ('string' if df[col].dtype == 'object' else 'numeric')
                  for col in df.columns }
  
             
@@ -1033,13 +1034,36 @@ uploaded_file = st.file_uploader(
 )
 
 if uploaded_file:
-    try:
         # Use the new data loading function
         df_raw = load_data_file(uploaded_file)
         
         st.success(f"Loaded {len(df_raw)} rows and {len(df_raw.columns)} columns from **{uploaded_file.name}**.")
         st.session_state.all_cols = list(df_raw.columns.tolist())
-        all_variable_options = ['-- Select Variable --'] + st.session_state.all_cols
+       
+
+        st.markdown("---")   # ← UI only, no problem at all
+
+        st.session_state.all_cols = list(df_raw.columns)
+
+# --------------------------------------------------
+# AUTO-DETECT VARIABLE TYPES (String vs Numeric)
+# --------------------------------------------------
+if 'string_vars' not in st.session_state:
+    st.session_state.string_vars = (
+        df_raw.select_dtypes(include=['object'])
+        .columns
+        .tolist()
+    )
+
+if 'numeric_vars' not in st.session_state:
+    st.session_state.numeric_vars = (
+        df_raw.select_dtypes(exclude=['object'])
+        .columns
+        .tolist()
+    )
+
+       
+all_variable_options = ['-- Select Variable --'] + st.session_state.all_cols
         
         st.markdown("---")
         st.header("Step 2: Define Validation Rules")
@@ -1179,7 +1203,93 @@ if uploaded_file:
             st.warning("Please define and add at least one validation rule in Step 2.")
             
 
-    except Exception as e:
         # A clearer error message for the user after the fixes
-        st.error(f"A critical error occurred during file processing or setup. Error: {e}")
-        st.exception(e) # Show full traceback for debugging if needed
+
+# =========================
+# CLEAN MAIN FLOW (FIXED)
+# =========================
+
+if uploaded_file:
+    df_raw = load_data_file(uploaded_file)
+
+    st.success(
+        f"Loaded {len(df_raw)} rows and {len(df_raw.columns)} columns from **{uploaded_file.name}**."
+    )
+
+    # Preserve SPSS variable order
+    st.session_state.all_cols = list(df_raw.columns)
+
+    # Auto-detect variable types (run once per upload)
+    if 'string_vars' not in st.session_state:
+        st.session_state.string_vars = (
+            df_raw.select_dtypes(include=['object'])
+            .columns
+            .tolist()
+        )
+
+    if 'numeric_vars' not in st.session_state:
+        st.session_state.numeric_vars = (
+            df_raw.select_dtypes(exclude=['object'])
+            .columns
+            .tolist()
+        )
+
+    all_variable_options = ['-- Select Variable --'] + st.session_state.all_cols
+
+    st.markdown("---")
+    st.header("Step 2: Define Validation Rules")
+
+    col_side_a, col_side_b = st.sidebar.columns(2)
+    with col_side_a:
+        st.sidebar.button("🗑️ Clear All Rules", on_click=clear_all_rules)
+    with col_side_b:
+        total_rules = (
+            len(st.session_state.sq_rules)
+            + len(st.session_state.mq_rules)
+            + len(st.session_state.ranking_rules)
+            + len(st.session_state.string_rules)
+            + len(st.session_state.straightliner_rules)
+        )
+        st.sidebar.markdown(f"**Total Rules:** {total_rules}")
+
+    display_rules(st.session_state.sq_rules, ['variable'], "Current 1. Single Select (SQ) / Rating Rules", 'sq')
+    display_rules(st.session_state.straightliner_rules, ['variables'], "Current 2. Straightliner (Grid) Rules", 'straightliner')
+    display_rules(st.session_state.mq_rules, ['variables'], "Current 3. Multi-Select (MQ) Rules", 'mq')
+    display_rules(st.session_state.string_rules, ['variable'], "Current 4. String/OE Rules", 'string')
+
+    configure_sq_rules(all_variable_options)
+    st.markdown("---")
+    configure_straightliner_rules()
+    st.markdown("---")
+    configure_mq_rules(all_variable_options)
+    st.markdown("---")
+    configure_string_rules(all_variable_options)
+    st.markdown("---")
+
+    st.header("Step 3: Generate Master Syntax")
+
+    total_rules = (
+        len(st.session_state.sq_rules)
+        + len(st.session_state.mq_rules)
+        + len(st.session_state.ranking_rules)
+        + len(st.session_state.string_rules)
+        + len(st.session_state.straightliner_rules)
+    )
+
+    if total_rules > 0:
+        master_spss_syntax = generate_master_spss_syntax(
+            st.session_state.sq_rules,
+            st.session_state.mq_rules,
+            st.session_state.ranking_rules,
+            st.session_state.string_rules,
+            st.session_state.straightliner_rules
+        )
+
+        st.success(f"Generated complete syntax for **{total_rules}** validation rules.")
+
+        st.download_button(
+            label="⬇️ Download Master SPSS Syntax (.sps)",
+            data=master_spss_syntax,
+            file_name="master_validation_script_knowledgeexcel.sps",
+            mime="text/plain"
+        )
