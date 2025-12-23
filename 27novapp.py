@@ -255,6 +255,8 @@ def generate_sq_spss_syntax(rule):
         trigger_col = rule['trigger_col']
         trigger_val = rule['trigger_val']
         
+        trigger_is_string = st.session_state.var_types.get(trigger_col) == 'string'
+        
         # B. Generate Filter Flag (Flag_Qx)
         syntax.append(f"**************************************SQ Filter Flag for Skip/Piping: {filter_flag}")
         syntax.append(f"* Filter for {target_clean}: {trigger_col} = {trigger_val}.")
