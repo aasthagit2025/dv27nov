@@ -99,11 +99,6 @@ def load_data_file(uploaded_file):
     else:
         raise Exception(f"Unsupported file format: {file_extension}. Please upload CSV, Excel (.xlsx/.xls), or SPSS (.sav/.zsav).")
 
-st.session_state.var_types = {
-    col: ('string' if df_raw[col].dtype == object else 'numeric')
-    for col in df_raw.columns
-}
-
 
 # --- CORE UTILITY FUNCTIONS (SYNTAX GENERATION) ---
 
@@ -1047,6 +1042,13 @@ if uploaded_file:
         st.success(f"Loaded {len(df_raw)} rows and {len(df_raw.columns)} columns from **{uploaded_file.name}**.")
         st.session_state.all_cols = list(df_raw.columns.tolist())
         all_variable_options = ['-- Select Variable --'] + st.session_state.all_cols
+
+        # ✅ Variable type detection (STRING vs NUMERIC)
+        st.session_state.var_types = {
+            col: ('string' if df_raw[col].dtype == object else 'numeric')
+            for col in df_raw.columns
+        }
+
         
         st.markdown("---")
         st.header("Step 2: Define Validation Rules")
