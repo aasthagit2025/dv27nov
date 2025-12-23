@@ -1,4 +1,3 @@
-
 import streamlit as st
 import pandas as pd
 import numpy as np
@@ -84,7 +83,7 @@ def load_data_file(uploaded_file):
             df = pd.read_spss(tmp_path, convert_categoricals=False)
 
                 # ✅ STORE VARIABLE TYPES FROM SPSS
-            st.session_state['var_types'] = {col: ('string' if df[col].dtype == 'object' else 'numeric')
+              st.session_state['var_types'] = {col: ('string' if df[col].dtype == 'object' else 'numeric')
                  for col in df.columns }
  
             
@@ -1034,36 +1033,13 @@ uploaded_file = st.file_uploader(
 )
 
 if uploaded_file:
+    try:
         # Use the new data loading function
         df_raw = load_data_file(uploaded_file)
         
         st.success(f"Loaded {len(df_raw)} rows and {len(df_raw.columns)} columns from **{uploaded_file.name}**.")
         st.session_state.all_cols = list(df_raw.columns.tolist())
-       
-
-        st.markdown("---")   # ← UI only, no problem at all
-
-        st.session_state.all_cols = list(df_raw.columns)
-
-# --------------------------------------------------
-# AUTO-DETECT VARIABLE TYPES (String vs Numeric)
-# --------------------------------------------------
-if 'string_vars' not in st.session_state:
-    st.session_state.string_vars = (
-        df_raw.select_dtypes(include=['object'])
-        .columns
-        .tolist()
-    )
-
-if 'numeric_vars' not in st.session_state:
-    st.session_state.numeric_vars = (
-        df_raw.select_dtypes(exclude=['object'])
-        .columns
-        .tolist()
-    )
-
-       
-all_variable_options = ['-- Select Variable --'] + st.session_state.all_cols
+        all_variable_options = ['-- Select Variable --'] + st.session_state.all_cols
         
         st.markdown("---")
         st.header("Step 2: Define Validation Rules")
@@ -1203,6 +1179,7 @@ all_variable_options = ['-- Select Variable --'] + st.session_state.all_cols
             st.warning("Please define and add at least one validation rule in Step 2.")
             
 
+    except Exception as e:
         # A clearer error message for the user after the fixes
         st.error(f"A critical error occurred during file processing or setup. Error: {e}")
         st.exception(e) # Show full traceback for debugging if needed
