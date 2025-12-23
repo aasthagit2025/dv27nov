@@ -1048,56 +1048,57 @@ if uploaded_file:
 # --------------------------------------------------
 # AUTO-DETECT VARIABLE TYPES (String vs Numeric)
 # --------------------------------------------------
-        if 'string_vars' not in st.session_state:
-            st.session_state.string_vars = (
-                df_raw.select_dtypes(include=['object'])
-                .columns
-                .tolist()
-            )
+if 'string_vars' not in st.session_state:
+    st.session_state.string_vars = (
+        df_raw.select_dtypes(include=['object'])
+        .columns
+        .tolist()
+    )
 
-        if 'numeric_vars' not in st.session_state:
-            st.session_state.numeric_vars = (
-                df_raw.select_dtypes(exclude=['object'])
-                .columns
-                .tolist()
-            )
-        
-        all_variable_options: list[str] = ['-- Select Variable --'] + st.session_state.all_cols
+if 'numeric_vars' not in st.session_state:
+    st.session_state.numeric_vars = (
+        df_raw.select_dtypes(exclude=['object'])
+        .columns
+        .tolist()
+    )
 
-        st.markdown("---")
-        st.header("Step 2: Define Validation Rules")
+       
+all_variable_options = ['-- Select Variable --'] + st.session_state.all_cols
         
-col_side_a, col_side_b = st.sidebar.columns(2)
-with col_side_a:
+    st.markdown("---")
+    st.header("Step 2: Define Validation Rules")
+        
+        col_side_a, col_side_b = st.sidebar.columns(2)
+        with col_side_a:
             st.sidebar.button("🗑️ Clear All Rules", on_click=clear_all_rules)
-with col_side_b:
+        with col_side_b:
             total_rules = len(st.session_state.sq_rules) + len(st.session_state.mq_rules) + len(st.session_state.ranking_rules) + len(st.session_state.string_rules) + len(st.session_state.straightliner_rules)
-st.sidebar.markdown(f"**Total Rules:** {total_rules}")
+            st.sidebar.markdown(f"**Total Rules:** {total_rules}")
         
         # Display existing rules
-display_rules(st.session_state.sq_rules, ['variable'], "Current 1. Single Select (SQ) / Rating Rules", 'sq')
-display_rules(st.session_state.straightliner_rules, ['variables'], "Current 2. Straightliner (Grid) Rules", 'straightliner')
-display_rules(st.session_state.mq_rules, ['variables'], "Current 3. Multi-Select (MQ) Rules", 'mq')
+        display_rules(st.session_state.sq_rules, ['variable'], "Current 1. Single Select (SQ) / Rating Rules", 'sq')
+        display_rules(st.session_state.straightliner_rules, ['variables'], "Current 2. Straightliner (Grid) Rules", 'straightliner')
+        display_rules(st.session_state.mq_rules, ['variables'], "Current 3. Multi-Select (MQ) Rules", 'mq')
         # Ranking Configuration is omitted for brevity but the generator is present
         # display_rules(st.session_state.ranking_rules, ['variables'], "Current Ranking Rules", 'ranking')
-display_rules(st.session_state.string_rules, ['variable'], "Current 4. String/OE Rules", 'string')
+        display_rules(st.session_state.string_rules, ['variable'], "Current 4. String/OE Rules", 'string')
 
 
         # New Configuration UIs
-configure_sq_rules(all_variable_options)
-st.markdown("---")
-configure_straightliner_rules()
-st.markdown("---")
-configure_mq_rules(all_variable_options)
-st.markdown("---")
-configure_string_rules(all_variable_options)
-st.markdown("---")
+        configure_sq_rules(all_variable_options)
+        st.markdown("---")
+        configure_straightliner_rules()
+        st.markdown("---")
+        configure_mq_rules(all_variable_options)
+        st.markdown("---")
+        configure_string_rules(all_variable_options)
+        st.markdown("---")
 
-st.header("Step 3: Generate Master Syntax")
+        st.header("Step 3: Generate Master Syntax")
         
-total_rules = len(st.session_state.sq_rules) + len(st.session_state.mq_rules) + len(st.session_state.ranking_rules) + len(st.session_state.string_rules) + len(st.session_state.straightliner_rules)
+        total_rules = len(st.session_state.sq_rules) + len(st.session_state.mq_rules) + len(st.session_state.ranking_rules) + len(st.session_state.string_rules) + len(st.session_state.straightliner_rules)
         
-if total_rules > 0:
+        if total_rules > 0:
             
             # --- Generate Master Outputs ---
             master_spss_syntax = generate_master_spss_syntax(
@@ -1198,7 +1199,7 @@ if total_rules > 0:
             
             st.code(preview_text + "\n\n*(...Download the .sps file for the complete detailed syntax)*", language='spss')
             
-else:
+        else:
             st.warning("Please define and add at least one validation rule in Step 2.")
             
 
