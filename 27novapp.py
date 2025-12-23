@@ -137,19 +137,19 @@ else:
 
      syntax.append(f"EXECUTE.\n") 
     
-    if rule_type == 'SQ' and range_min is not None and range_max is not None:
+if rule_type == 'SQ' and range_min is not None and range_max is not None:
         # EoO: Trigger met AND (Missing OR Out-of-Range)
         eoo_condition = f"(miss({target_col}) | ~range({target_col},{range_min},{range_max}))"
         # EoC: Trigger NOT met AND (Answered)
         eoc_condition = f"~miss({target_col})" 
         
-    elif rule_type == 'String':
+elif rule_type == 'String':
         # EoO: Trigger met AND (Missing OR Empty String)
         eoo_condition = f"({target_col}='' | miss({target_col}))"
         # EoC: Trigger NOT met AND (Not Missing AND Not Empty)
         eoc_condition = f"({target_col}<>'' & ~miss({target_col}))" 
         
-    else: # MQ/Ranking/General
+else: # MQ/Ranking/General
         eoo_condition = f"miss({target_col})"
         eoc_condition = f"~miss({target_col})" 
         
