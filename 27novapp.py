@@ -264,11 +264,11 @@ def generate_sq_spss_syntax(rule):
         syntax.append(f"**************************************SQ Filter Flag for Skip/Piping: {filter_flag}")
         syntax.append(f"* Filter for {target_clean}: {trigger_col} = {trigger_val}.")
         if trigger_is_string:
-    trigger_condition = f"{trigger_col}<>''"
-else:
-    trigger_condition = f"{trigger_col} = {trigger_val}"
+        trigger_condition = f"{trigger_col}<>''"
+         else:
+         trigger_condition = f"{trigger_col} = {trigger_val}"
 
-syntax.append(f"IF({trigger_condition}) {filter_flag}=1.")
+        syntax.append(f"IF({trigger_condition}) {filter_flag}=1.")
 
         syntax.append(f"EXECUTE.\n")
         generated_flags.append(filter_flag)
