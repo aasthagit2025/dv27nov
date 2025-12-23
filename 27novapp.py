@@ -151,9 +151,10 @@ else:
     eoo_condition = f"miss({target_col})"
     eoc_condition = f"~miss({target_col})"
 
-else: # MQ/Ranking/General
-        eoo_condition = f"miss({target_col})"
-        eoc_condition = f"~miss({target_col})" 
+else: 
+     # MQ/Ranking/General
+      eoo_condition = f"miss({target_col})"
+      eoc_condition = f"~miss({target_col})" 
         
     # --- EoO/EoC Logic ---
      syntax.append(f"**************************************SKIP LOGIC EoO/EoC CHECK: {target_col} -> {final_error_flag}")
