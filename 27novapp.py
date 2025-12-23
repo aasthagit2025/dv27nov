@@ -1048,25 +1048,24 @@ if uploaded_file:
 # --------------------------------------------------
 # AUTO-DETECT VARIABLE TYPES (String vs Numeric)
 # --------------------------------------------------
-if 'string_vars' not in st.session_state:
-    st.session_state.string_vars = (
-        df_raw.select_dtypes(include=['object'])
-        .columns
-        .tolist()
-    )
+        if 'string_vars' not in st.session_state:
+            st.session_state.string_vars = (
+                df_raw.select_dtypes(include=['object'])
+                .columns
+                .tolist()
+            )
 
-if 'numeric_vars' not in st.session_state:
-    st.session_state.numeric_vars = (
-        df_raw.select_dtypes(exclude=['object'])
-        .columns
-        .tolist()
-    )
-
-       
-all_variable_options = ['-- Select Variable --'] + st.session_state.all_cols
+        if 'numeric_vars' not in st.session_state:
+            st.session_state.numeric_vars = (
+                df_raw.select_dtypes(exclude=['object'])
+                .columns
+                .tolist()
+            )
         
-st.markdown("---")
-st.header("Step 2: Define Validation Rules")
+        all_variable_options: list[str] = ['-- Select Variable --'] + st.session_state.all_cols
+
+        st.markdown("---")
+        st.header("Step 2: Define Validation Rules")
         
 col_side_a, col_side_b = st.sidebar.columns(2)
 with col_side_a:
