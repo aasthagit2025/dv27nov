@@ -154,17 +154,17 @@ else: # MQ/Ranking/General
         eoc_condition = f"~miss({target_col})" 
         
     # --- EoO/EoC Logic ---
-    syntax.append(f"**************************************SKIP LOGIC EoO/EoC CHECK: {target_col} -> {final_error_flag}")
+     syntax.append(f"**************************************SKIP LOGIC EoO/EoC CHECK: {target_col} -> {final_error_flag}")
     
     # Error of Omission (EoO) - Flag=1
-    syntax.append(f"* EoO (1): Trigger Met ({filter_flag}=1), Target Fails Check/Missing/Out-of-Range/Empty.")
-    syntax.append(f"IF({filter_flag} = 1 & {eoo_condition}) {final_error_flag}=1.")
+     syntax.append(f"* EoO (1): Trigger Met ({filter_flag}=1), Target Fails Check/Missing/Out-of-Range/Empty.")
+     syntax.append(f"IF({filter_flag} = 1 & {eoo_condition}) {final_error_flag}=1.")
     
     # Error of Commission (EoC) - Flag=2
-    syntax.append(f"* EoC (2): Trigger Not Met ({filter_flag}<>1 | miss({filter_flag})), Target Answered.")
-    syntax.append(f"IF(({filter_flag} <> 1 | miss({filter_flag})) & {eoc_condition}) {final_error_flag}=2.")
+     syntax.append(f"* EoC (2): Trigger Not Met ({filter_flag}<>1 | miss({filter_flag})), Target Answered.")
+     syntax.append(f"IF(({filter_flag} <> 1 | miss({filter_flag})) & {eoc_condition}) {final_error_flag}=2.")
     
-    syntax.append("EXECUTE.\n")
+     syntax.append("EXECUTE.\n")
     
     return syntax, [filter_flag, final_error_flag]
 
