@@ -1105,36 +1105,43 @@ if uploaded_file:
         st.error(f"A critical error occurred during file processing or setup. Error: {e}")
         st.exception(e) 
 
-# ✅ STEP 3 MUST BE HERE (OUTSIDE except)     
+# ================= STEP 3: GENERATE MASTER SYNTAX =================
+
 st.header("Step 3: Generate Master Syntax")
-        
-total_rules = len(st.session_state.sq_rules) + len(st.session_state.mq_rules) + len(st.session_state.ranking_rules) + len(st.session_state.string_rules) + len(st.session_state.straightliner_rules)
-        
+
+total_rules = (
+    len(st.session_state.sq_rules)
+    + len(st.session_state.mq_rules)
+    + len(st.session_state.ranking_rules)
+    + len(st.session_state.string_rules)
+    + len(st.session_state.straightliner_rules)
+)
+
 if total_rules > 0:
     if st.button("🚀 Generate Master SPSS Syntax"):
         master_spss_syntax = generate_master_spss_syntax(
-                st.session_state.sq_rules,
-                st.session_state.mq_rules,
-                st.session_state.ranking_rules,
-                st.session_state.string_rules,
-                st.session_state.straightliner_rules
-            )
+            st.session_state.sq_rules,
+            st.session_state.mq_rules,
+            st.session_state.ranking_rules,
+            st.session_state.string_rules,
+            st.session_state.straightliner_rules
+        )
 
-                st.download_button(
-                "⬇️ Download Master SPSS Syntax (.sps)",
-                master_spss_syntax,
-                "master_validation_script_knowledgeexcel.sps",
-                "text/plain"
-            )
-            
-                st.code(
-                master_spss_syntax[:3000]
-                + "\n\n*(Preview truncated – download full file)*",
-                language="spss"
-            )
-    else:
-        st.info("Please define at least one validation rule in Step 2.")
-            
+        st.download_button(
+            "⬇️ Download Master SPSS Syntax (.sps)",
+            master_spss_syntax,
+            "master_validation_script_knowledgeexcel.sps",
+            "text/plain"
+        )
+
+        st.code(
+            master_spss_syntax[:3000]
+            + "\n\n*(Preview truncated – download full file)*",
+            language="spss"
+        )
+else:
+    st.info("Please define at least one validation rule in Step 2.")
+
             st.subheader("Preview of Generated Detailed SPSS Logic (Filter/Skip/Straightliner)")
             
             preview_syntax_list = []
