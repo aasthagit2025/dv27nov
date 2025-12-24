@@ -130,10 +130,8 @@ def generate_skip_spss_syntax(target_col, trigger_col, trigger_val, rule_type, r
         eoc_condition = f"~miss({target_col})" 
         
     elif rule_type == 'String':
-        # EoO: Trigger met AND (Missing OR Empty String)
-        eoo_condition = f"({target_col}='' | miss({target_col}))"
-        # EoC: Trigger NOT met AND (Not Missing AND Not Empty)
-        eoc_condition = f"({target_col}<>'' & ~miss({target_col}))" 
+        eoo_condition = f"{target_col}=''"
+        eoc_condition = f"{target_col}<>''"
         
     else: # MQ/Ranking/General
         eoo_condition = f"miss({target_col})"
