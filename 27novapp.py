@@ -1099,18 +1099,6 @@ if uploaded_file:
         
         st.markdown("---")
 
-# ✅ CONDITIONAL UI LOADING
-        if active_step == "Single Select (SQ)":
-            configure_sq_rules(all_variable_options)
-
-        elif active_step == "Straightliner":
-            configure_straightliner_rules()
-
-        elif active_step == "Multi Select (MQ)":
-            configure_mq_rules(all_variable_options)
-
-        elif active_step == "Open End (OE)":
-            configure_string_rules(all_variable_options)
 
     except Exception as e:
         st.error(f"A critical error occurred during file processing or setup. Error: {e}")
