@@ -134,7 +134,7 @@ syntax.append(f"IF({trigger_condition}) {filter_flag}=1.")
 
 syntax.append(f"EXECUTE.\n") 
     
-    if rule_type == 'SQ' and range_min is not None and range_max is not None:
+if rule_type == 'SQ' and range_min is not None and range_max is not None:
         # EoO: Trigger met AND (Missing OR Out-of-Range)
         eoo_condition = f"(miss({target_col}) | ~range({target_col},{range_min},{range_max}))"
         # EoC: Trigger NOT met AND (Answered)
