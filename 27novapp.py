@@ -1051,7 +1051,7 @@ if uploaded_file:
         all_variable_options = ['-- Select Variable --'] + st.session_state.all_cols
 
 
-        st.markdown("## Step 2: Configure Validation Rules")
+
 # ---------- STEP 2: CONFIGURE VALIDATION RULES (LAZY LOADED) ----------
 
         with st.expander("1. Single Select (SQ) / Rating Rules", expanded=False):
@@ -1098,14 +1098,6 @@ if uploaded_file:
 
         
         st.markdown("---")
-        st.header("Step 2: Define Validation Rules")
-        
-        col_side_a, col_side_b = st.sidebar.columns(2)
-        with col_side_a:
-            st.sidebar.button("🗑️ Clear All Rules", on_click=clear_all_rules)
-        with col_side_b:
-            total_rules = len(st.session_state.sq_rules) + len(st.session_state.mq_rules) + len(st.session_state.ranking_rules) + len(st.session_state.string_rules) + len(st.session_state.straightliner_rules)
-            st.sidebar.markdown(f"**Total Rules:** {total_rules}")
 
 # ✅ CONDITIONAL UI LOADING
         if active_step == "Single Select (SQ)":
