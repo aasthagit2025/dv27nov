@@ -1233,8 +1233,13 @@ if preview_syntax_list:
     st.info("Showing preview of the detailed structure of a configured check:")
     preview_text = "\n".join(preview_syntax_list[:40])
 else:
-    st.info("No detailed logic configured. Showing top of file.")
-    preview_text = "\n".join(master_spss_syntax.split("\n")[:20])
+    st.info("No detailed logic configured.")
+
+    if 'master_spss_syntax' in locals():
+        preview_text = "\n".join(master_spss_syntax.split("\n")[:20])
+    else:
+        preview_text = "*Master syntax not generated yet. Click 'Generate Master SPSS Syntax' to see preview.*"
+
 
 st.code(
     preview_text + "\n\n*(...Download the .sps file for the complete detailed syntax)*",
