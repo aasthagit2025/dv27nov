@@ -1142,19 +1142,24 @@ if total_rules > 0:
 else:
     st.info("Please define at least one validation rule in Step 2.")
 
-            st.subheader("Preview of Generated Detailed SPSS Logic (Filter/Skip/Straightliner)")
+st.subheader("Preview of Generated Detailed SPSS Logic (Filter/Skip/Straightliner)")
+st.code(preview_syntax, language="spss")
             
-            preview_syntax_list = []
-            
-            def get_syntax_for_preview(rule_list, generator_func, rule_type):
-                if not rule_list: return False
-                rule = rule_list[0] # Just take the first rule for preview
-                
-                # Straightliner check (different logic)
-                if rule_type == 'straightliner':
-                     syntax, _ = generator_func(rule['variables'])
-                     preview_syntax_list.extend(syntax)
-                     return True
+def get_syntax_for_preview(rule_list, generator_func, rule_type, preview_syntax_list):
+    if not rule_list:
+        return False
+
+    rule = rule_list[0]  # Take first rule only for preview
+
+    if rule_type == 'straightliner':
+        syntax, _ = generator_func(rule['variables'])
+        preview_syntax_list.extend(syntax)
+        return True
+
+    syntax, _ = generator_func(rule)
+    preview_syntax_list.extend(syntax)
+    return True
+
                 
                 # Skip Logic / Piping / Other Checks
                 if (rule.get('run_skip') or rule.get('run_piping_check')) and rule['trigger_col'] != '-- Select Variable --':
