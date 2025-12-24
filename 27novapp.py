@@ -1164,7 +1164,17 @@ if uploaded_file:
 
 # ================= STEP 3: GENERATE MASTER SYNTAX =================
 
-st.header("Step 3: Generate Master Syntax")
+if (
+    st.session_state.sq_rules
+    or st.session_state.mq_rules
+    or st.session_state.string_rules
+    or st.session_state.straightliner_rules
+):
+    st.header("Step 3: Generate Master Syntax")
+    # existing Step 3 code here
+else:
+    st.info("Please define at least one validation rule in Step 2.")
+
 
 total_rules = (
     len(st.session_state.sq_rules)
@@ -1235,8 +1245,21 @@ if preview_syntax_list:
 else:
     st.info("No detailed logic configured.")
 
-    if 'master_spss_syntax' in locals():
+if 'master_spss_syntax' in locals():
+    st.subheader("Preview of Generated Detailed SPSS Logic (Filter / Skip / Straightliner)")
+    
+    if preview_syntax_list:
+        st.info("Showing preview of the detailed structure of a configured check:")
+        preview_text = "\n".join(preview_syntax_list[:40])
+    else:
+        st.info("No detailed logic configured. Showing top of file.")
         preview_text = "\n".join(master_spss_syntax.split("\n")[:20])
+
+    st.code(
+        preview_text + "\n\n*(...Download the .sps file for the complete detailed syntax)*",
+        language="spss"
+    )
+
     else:
         preview_text = "*Master syntax not generated yet. Click 'Generate Master SPSS Syntax' to see preview.*"
 
