@@ -1120,14 +1120,14 @@ if total_rules > 0:
                 st.session_state.straightliner_rules
             )
 
-       st.download_button(
+                st.download_button(
                 "⬇️ Download Master SPSS Syntax (.sps)",
                 master_spss_syntax,
                 "master_validation_script_knowledgeexcel.sps",
                 "text/plain"
             )
             
-       st.code(
+                st.code(
                 master_spss_syntax[:3000]
                 + "\n\n*(Preview truncated – download full file)*",
                 language="spss"
