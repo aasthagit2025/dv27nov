@@ -7,7 +7,64 @@ import os
 import tempfile # NEW: Required for the robust SPSS file handling fix
 
 # --- Configuration ---
-FLAG_PREFIX = "xx" 
+FLAG_PREFIX = "xx"
+
+
+def get_syntax_for_preview(rule_list, generator_func, rule_type, preview_syntax_list):
+    if not rule_list:
+        return False
+
+    rule = rule_list[0]  # Take first rule only for preview
+
+    if rule_type == 'straightliner':
+        syntax, _ = generator_func(rule['variables'])
+        preview_syntax_list.extend(syntax)
+        return True
+
+    # Skip / piping logic
+    if (rule.get('run_skip') or rule.get('run_piping_check')) and rule.get('trigger_col') != '-- Select Variable --':
+        target = rule.get('variable') or rule['variables'][0].split('_')[0]
+
+        if rule.get('run_piping_check') and rule.get('piping_source_col') != '-- Select Variable --':
+            target_clean = target.split('_')[0] if '_' in target else target
+            filter_flag = f"Flag_{target_clean}"
+
+            sl_syntax = [
+                f"**************************************SQ Filter Flag for Skip/Piping: {filter_flag}",
+                f"* Filter for {target_clean}: {rule['trigger_col']} = {rule['trigger_val']}.",
+                f"IF({rule['trigger_col']} = {rule['trigger_val']}) {filter_flag}=1.",
+                "EXECUTE.\n"
+            ]
+
+            pipe_syntax, _ = generate_piping_spss_syntax(
+                target, filter_flag, rule['piping_source_col'], rule['piping_stub_val']
+            )
+            sl_syntax.extend(pipe_syntax)
+            preview_syntax_list.extend(sl_syntax)
+            return True
+
+        elif rule.get('run_skip'):
+            sl_type = 'SQ' if rule_type in ['sq', 'string'] else 'MQ'
+            min_val = rule.get('min_val') if rule_type == 'sq' else None
+            max_val = rule.get('max_val') if rule_type == 'sq' else None
+
+            sl_syntax, _ = generate_skip_spss_syntax(
+                target, rule['trigger_col'], rule['trigger_val'], sl_type, min_val, max_val
+            )
+            preview_syntax_list.extend(sl_syntax)
+            return True
+
+    if rule_type == 'string' and not rule.get('run_skip'):
+        syntax, _ = generator_func(rule)
+        missing_check = [line for line in syntax if '_Miss' in line or '*' in line]
+        preview_syntax_list.extend(missing_check)
+        return True
+
+    syntax, _ = generator_func(rule)
+    preview_syntax_list.extend(syntax)
+    return True
+
+ 
 st.set_page_config(layout="wide")
 st.title("📊 Survey Data Validation Automation (Variable-Centric Model)")
 st.markdown("Generates **KnowledgeExcel-compatible SPSS `IF` logic syntax** (`xx` prefix) by allowing **batch selection** and **sequential rule configuration**.")
@@ -1142,94 +1199,44 @@ if total_rules > 0:
 else:
     st.info("Please define at least one validation rule in Step 2.")
 
-st.subheader("Preview of Generated Detailed SPSS Logic (Filter/Skip/Straightliner)")
-st.code(preview_syntax, language="spss")
-            
-def get_syntax_for_preview(rule_list, generator_func, rule_type, preview_syntax_list):
-    if not rule_list:
-        return False
 
-    rule = rule_list[0]  # Take first rule only for preview
+# -------- PREVIEW (CLEAN & SAFE) --------
+preview_syntax_list = []
 
-    if rule_type == 'straightliner':
-        syntax, _ = generator_func(rule['variables'])
-        preview_syntax_list.extend(syntax)
-        return True
+if not get_syntax_for_preview(
+    st.session_state.straightliner_rules,
+    generate_straightliner_spss_syntax,
+    'straightliner',
+    preview_syntax_list
+):
+    if not get_syntax_for_preview(
+        st.session_state.sq_rules,
+        generate_sq_spss_syntax,
+        'sq',
+        preview_syntax_list
+    ):
+        if not get_syntax_for_preview(
+            st.session_state.mq_rules,
+            generate_mq_spss_syntax,
+            'mq',
+            preview_syntax_list
+        ):
+            get_syntax_for_preview(
+                st.session_state.string_rules,
+                generate_string_spss_syntax,
+                'string',
+                preview_syntax_list
+            )
 
-    syntax, _ = generator_func(rule)
-    preview_syntax_list.extend(syntax)
-    return True
+st.subheader("Preview of Generated Detailed SPSS Logic (Filter / Skip / Straightliner)")
+if preview_syntax_list:
+    st.info("Showing preview of the detailed structure of a configured check:")
+    preview_text = "\n".join(preview_syntax_list[:40])
+else:
+    st.info("No detailed logic configured. Showing top of file.")
+    preview_text = "\n".join(master_spss_syntax.split("\n")[:20])
 
-                
-                # Skip Logic / Piping / Other Checks
-                if (rule.get('run_skip') or rule.get('run_piping_check')) and rule['trigger_col'] != '-- Select Variable --':
-                    target = rule.get('variable') or rule['variables'][0].split('_')[0]
-                    
-                    if rule.get('run_piping_check') and rule.get('piping_source_col') != '-- Select Variable --':
-                        target_clean = target.split('_')[0] if '_' in target else target
-                        filter_flag = f"Flag_{target_clean}"
-                        
-                        sl_syntax = [
-                            f"**************************************SQ Filter Flag for Skip/Piping: {filter_flag}",
-                            f"* Filter for {target_clean}: {rule['trigger_col']} = {rule['trigger_val']}.",
-                            f"IF({rule['trigger_col']} = {rule['trigger_val']}) {filter_flag}=1.",
-                            f"EXECUTE.\n"
-                        ]
-                        
-                        pipe_syntax, _ = generate_piping_spss_syntax(
-                            target, filter_flag, rule['piping_source_col'], rule['piping_stub_val']
-                        )
-                        sl_syntax.extend(pipe_syntax)
-                        preview_syntax_list.extend(sl_syntax)
-                    
-                    elif rule.get('run_skip'):
-                        sl_type = 'SQ' if rule_type == 'sq' or rule_type == 'string' else 'MQ'
-                        min_val = rule.get('min_val') if rule_type == 'sq' else None
-                        max_val = rule.get('max_val') if rule_type == 'sq' else None
-                        
-                        sl_syntax, _ = generate_skip_spss_syntax(
-                            target, 
-                            rule['trigger_col'], 
-                            rule['trigger_val'], 
-                            sl_type, 
-                            min_val, 
-                            max_val
-                        )
-                        preview_syntax_list.extend(sl_syntax)
-
-                    return True
-                
-                # Explicit Missing Check (String only)
-                if rule_type == 'string' and not rule.get('run_skip'):
-                    syntax, _ = generator_func(rule)
-                    # Filter to just the missing check part
-                    missing_check_syntax = [line for line in syntax if '_Miss' in line or '*' in line]
-                    preview_syntax_list.extend(missing_check_syntax)
-                    return True
-
-                return False
-
-            # Find the first rule of any type that has a detailed logic to show
-            if not get_syntax_for_preview(st.session_state.straightliner_rules, generate_straightliner_spss_syntax, 'straightliner'):
-                if not get_syntax_for_preview(st.session_state.sq_rules, generate_sq_spss_syntax, 'sq'):
-                    if not get_syntax_for_preview(st.session_state.mq_rules, generate_mq_spss_syntax, 'mq'):
-                        get_syntax_for_preview(st.session_state.string_rules, generate_string_spss_syntax, 'string')
-
-
-            if preview_syntax_list:
-                st.info("Showing preview of the detailed structure of a configured check:")
-                preview_text = '\n'.join(preview_syntax_list[:40]) 
-            else:
-                st.info("No detailed logic configured. Showing top of file.")
-                preview_text = '\n'.join(master_spss_syntax.split('\n')[:20]) 
-            
-            st.code(preview_text + "\n\n*(...Download the .sps file for the complete detailed syntax)*", language='spss')
-            
-        else:
-            st.warning("Please define and add at least one validation rule in Step 2.")
-            
-
-    except Exception as e:
-        # A clearer error message for the user after the fixes
-        st.error(f"A critical error occurred during file processing or setup. Error: {e}")
-        st.exception(e) # Show full traceback for debugging if needed
+st.code(
+    preview_text + "\n\n*(...Download the .sps file for the complete detailed syntax)*",
+    language="spss"
+)
