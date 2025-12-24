@@ -1052,16 +1052,42 @@ if uploaded_file:
 
         st.markdown("## Step 2: Configure Validation Rules")
 
-        active_step = st.radio(
-           "Select configuration step",
-            [
-              "Single Select (SQ)",
-              "Straightliner",
-              "Multi Select (MQ)",
-              "Open End (OE)"
-            ],
-            horizontal=True
-       )
+       if active_step == "Single Select (SQ)":
+          display_rules(
+               st.session_state.sq_rules,
+                ['variable'],
+                "Current Single Select (SQ) Rules",
+                'sq'
+    )
+     configure_sq_rules(all_variable_options)
+
+       elif active_step == "Straightliner":
+          display_rules(
+              st.session_state.straightliner_rules,
+              ['variables'],
+              "Current Straightliner Rules",
+              'straightliner'
+    )
+    configure_straightliner_rules()
+
+       elif active_step == "Multi Select (MQ)":
+           display_rules(
+               st.session_state.mq_rules,
+               ['variables'],
+               "Current Multi-Select (MQ) Rules",
+               'mq'
+    )
+    configure_mq_rules(all_variable_options)
+
+       elif active_step == "Open End (OE):
+           display_rules(
+               st.session_state.string_rules,
+               ['variable'],
+               "Current Open-End (OE) Rules",
+               'string'
+    )
+    configure_string_rules(all_variable_options)
+
 
 
         # ✅ Variable type detection (STRING vs NUMERIC)
@@ -1080,15 +1106,6 @@ if uploaded_file:
         with col_side_b:
             total_rules = len(st.session_state.sq_rules) + len(st.session_state.mq_rules) + len(st.session_state.ranking_rules) + len(st.session_state.string_rules) + len(st.session_state.straightliner_rules)
             st.sidebar.markdown(f"**Total Rules:** {total_rules}")
-        
-        # Display existing rules
-        display_rules(st.session_state.sq_rules, ['variable'], "Current 1. Single Select (SQ) / Rating Rules", 'sq')
-        display_rules(st.session_state.straightliner_rules, ['variables'], "Current 2. Straightliner (Grid) Rules", 'straightliner')
-        display_rules(st.session_state.mq_rules, ['variables'], "Current 3. Multi-Select (MQ) Rules", 'mq')
-        # Ranking Configuration is omitted for brevity but the generator is present
-        # display_rules(st.session_state.ranking_rules, ['variables'], "Current Ranking Rules", 'ranking')
-        display_rules(st.session_state.string_rules, ['variable'], "Current 4. String/OE Rules", 'string')
-
 
 # ✅ CONDITIONAL UI LOADING
         if active_step == "Single Select (SQ)":
