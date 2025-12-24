@@ -1108,9 +1108,9 @@ if uploaded_file:
 # ✅ STEP 3 MUST BE HERE (OUTSIDE except)     
 st.header("Step 3: Generate Master Syntax")
         
-      total_rules = len(st.session_state.sq_rules) + len(st.session_state.mq_rules) + len(st.session_state.ranking_rules) + len(st.session_state.string_rules) + len(st.session_state.straightliner_rules)
+total_rules = len(st.session_state.sq_rules) + len(st.session_state.mq_rules) + len(st.session_state.ranking_rules) + len(st.session_state.string_rules) + len(st.session_state.straightliner_rules)
         
-       if total_rules > 0:
+ if total_rules > 0:
             
             # --- Generate Master Outputs ---
             master_spss_syntax = generate_master_spss_syntax(
