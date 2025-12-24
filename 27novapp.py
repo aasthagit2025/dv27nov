@@ -1101,13 +1101,15 @@ if uploaded_file:
 
 
     except Exception as e:
-        st.error(f"A critical error occurred during file processing or setup. Error: {e}")
 
-        st.header("Step 3: Generate Master Syntax")
+        st.error(f"A critical error occurred during file processing or setup. Error: {e}")
+        st.exception(e) 
+
+     st.header("Step 3: Generate Master Syntax")
         
-        total_rules = len(st.session_state.sq_rules) + len(st.session_state.mq_rules) + len(st.session_state.ranking_rules) + len(st.session_state.string_rules) + len(st.session_state.straightliner_rules)
+      total_rules = len(st.session_state.sq_rules) + len(st.session_state.mq_rules) + len(st.session_state.ranking_rules) + len(st.session_state.string_rules) + len(st.session_state.straightliner_rules)
         
-        if total_rules > 0:
+       if total_rules > 0:
             
             # --- Generate Master Outputs ---
             master_spss_syntax = generate_master_spss_syntax(
