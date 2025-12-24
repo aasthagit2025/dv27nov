@@ -1108,6 +1108,21 @@ if uploaded_file:
         all_variable_options = ['-- Select Variable --'] + st.session_state.all_cols
 
 
+        # ✅ Variable type detection (STRING vs NUMERIC)
+        st.session_state.var_types = {
+            col: ('string' if df_raw[col].dtype == object else 'numeric')
+            for col in df_raw.columns
+        }
+
+        
+        st.markdown("---")
+
+
+    except Exception as e:
+
+        st.error(f"A critical error occurred during file processing or setup. Error: {e}")
+        st.exception(e) 
+        
 
 # ---------- STEP 2: CONFIGURE VALIDATION RULES (LAZY LOADED) ----------
 
@@ -1147,20 +1162,6 @@ if uploaded_file:
             )
             configure_string_rules(all_variable_options)
 
-        # ✅ Variable type detection (STRING vs NUMERIC)
-        st.session_state.var_types = {
-            col: ('string' if df_raw[col].dtype == object else 'numeric')
-            for col in df_raw.columns
-        }
-
-        
-        st.markdown("---")
-
-
-    except Exception as e:
-
-        st.error(f"A critical error occurred during file processing or setup. Error: {e}")
-        st.exception(e) 
 
 # ================= STEP 3: GENERATE MASTER SYNTAX =================
 
@@ -1210,44 +1211,39 @@ else:
     st.info("Please define at least one validation rule in Step 2.")
 
 
-# -------- PREVIEW (CLEAN & SAFE) --------
-preview_syntax_list = []
 
-if not get_syntax_for_preview(
-    st.session_state.straightliner_rules,
-    generate_straightliner_spss_syntax,
-    'straightliner',
-    preview_syntax_list
-):
+# ================= PREVIEW (ONLY AFTER MASTER SYNTAX) =================
+if 'master_spss_syntax' in locals():
+
+    preview_syntax_list = []
+
     if not get_syntax_for_preview(
-        st.session_state.sq_rules,
-        generate_sq_spss_syntax,
-        'sq',
+        st.session_state.straightliner_rules,
+        generate_straightliner_spss_syntax,
+        'straightliner',
         preview_syntax_list
     ):
         if not get_syntax_for_preview(
-            st.session_state.mq_rules,
-            generate_mq_spss_syntax,
-            'mq',
+            st.session_state.sq_rules,
+            generate_sq_spss_syntax,
+            'sq',
             preview_syntax_list
         ):
-            get_syntax_for_preview(
-                st.session_state.string_rules,
-                generate_string_spss_syntax,
-                'string',
+            if not get_syntax_for_preview(
+                st.session_state.mq_rules,
+                generate_mq_spss_syntax,
+                'mq',
                 preview_syntax_list
-            )
+            ):
+                get_syntax_for_preview(
+                    st.session_state.string_rules,
+                    generate_string_spss_syntax,
+                    'string',
+                    preview_syntax_list
+                )
 
-st.subheader("Preview of Generated Detailed SPSS Logic (Filter / Skip / Straightliner)")
-if preview_syntax_list:
-    st.info("Showing preview of the detailed structure of a configured check:")
-    preview_text = "\n".join(preview_syntax_list[:40])
-else:
-    st.info("No detailed logic configured.")
-
-if 'master_spss_syntax' in locals():
     st.subheader("Preview of Generated Detailed SPSS Logic (Filter / Skip / Straightliner)")
-    
+
     if preview_syntax_list:
         st.info("Showing preview of the detailed structure of a configured check:")
         preview_text = "\n".join(preview_syntax_list[:40])
@@ -1259,12 +1255,3 @@ if 'master_spss_syntax' in locals():
         preview_text + "\n\n*(...Download the .sps file for the complete detailed syntax)*",
         language="spss"
     )
-
-    else:
-        preview_text = "*Master syntax not generated yet. Click 'Generate Master SPSS Syntax' to see preview.*"
-
-
-st.code(
-    preview_text + "\n\n*(...Download the .sps file for the complete detailed syntax)*",
-    language="spss"
-)
