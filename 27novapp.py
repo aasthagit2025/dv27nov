@@ -1090,18 +1090,21 @@ if uploaded_file:
         display_rules(st.session_state.string_rules, ['variable'], "Current 4. String/OE Rules", 'string')
 
 
-        # New Configuration UIs
-if active_step == "Single Select (SQ)":
-    configure_sq_rules(all_variable_options)
+# ✅ CONDITIONAL UI LOADING
+        if active_step == "Single Select (SQ)":
+            configure_sq_rules(all_variable_options)
 
-elif active_step == "Straightliner":
-    configure_straightliner_rules()
+        elif active_step == "Straightliner":
+            configure_straightliner_rules()
 
-elif active_step == "Multi Select (MQ)":
-    configure_mq_rules(all_variable_options)
+        elif active_step == "Multi Select (MQ)":
+            configure_mq_rules(all_variable_options)
 
-elif active_step == "Open End (OE)":
-    configure_string_rules(all_variable_options)
+        elif active_step == "Open End (OE)":
+            configure_string_rules(all_variable_options)
+
+    except Exception as e:
+        st.error(f"A critical error occurred during file processing or setup. Error: {e}")
 
         st.header("Step 3: Generate Master Syntax")
         
