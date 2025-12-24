@@ -1052,41 +1052,41 @@ if uploaded_file:
 
         st.markdown("## Step 2: Configure Validation Rules")
 
-       if active_step == "Single Select (SQ)":
-          display_rules(
-               st.session_state.sq_rules,
+        if active_step == "Single Select (SQ)":
+            display_rules(
+                st.session_state.sq_rules,
                 ['variable'],
                 "Current Single Select (SQ) Rules",
                 'sq'
-    )
-     configure_sq_rules(all_variable_options)
+            )
+            configure_sq_rules(all_variable_options)
 
-       elif active_step == "Straightliner":
-          display_rules(
-              st.session_state.straightliner_rules,
-              ['variables'],
-              "Current Straightliner Rules",
-              'straightliner'
-    )
-    configure_straightliner_rules()
+        elif active_step == "Straightliner":
+            display_rules(
+                st.session_state.straightliner_rules,
+                ['variables'],
+                "Current Straightliner Rules",
+                'straightliner'
+            )
+            configure_straightliner_rules()
 
-       elif active_step == "Multi Select (MQ)":
-           display_rules(
-               st.session_state.mq_rules,
-               ['variables'],
-               "Current Multi-Select (MQ) Rules",
-               'mq'
-    )
-    configure_mq_rules(all_variable_options)
+        elif active_step == "Multi Select (MQ)":
+            display_rules(
+                st.session_state.mq_rules,
+                ['variables'],
+                "Current Multi-Select (MQ) Rules",
+                'mq'
+            )
+            configure_mq_rules(all_variable_options)
 
-       elif active_step == "Open End (OE):
-           display_rules(
-               st.session_state.string_rules,
-               ['variable'],
-               "Current Open-End (OE) Rules",
-               'string'
-    )
-    configure_string_rules(all_variable_options)
+        elif active_step == "Open End (OE)":
+            display_rules(
+                st.session_state.string_rules,
+                ['variable'],
+                "Current Open-End (OE) Rules",
+                'string'
+            )
+            configure_string_rules(all_variable_options)
 
 
 
