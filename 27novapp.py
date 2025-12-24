@@ -1110,28 +1110,30 @@ st.header("Step 3: Generate Master Syntax")
         
 total_rules = len(st.session_state.sq_rules) + len(st.session_state.mq_rules) + len(st.session_state.ranking_rules) + len(st.session_state.string_rules) + len(st.session_state.straightliner_rules)
         
- if total_rules > 0:
-            
-            # --- Generate Master Outputs ---
-            master_spss_syntax = generate_master_spss_syntax(
-                st.session_state.sq_rules, 
-                st.session_state.mq_rules, 
-                st.session_state.ranking_rules, 
+if total_rules > 0:
+    if st.button("🚀 Generate Master SPSS Syntax"):
+        master_spss_syntax = generate_master_spss_syntax(
+                st.session_state.sq_rules,
+                st.session_state.mq_rules,
+                st.session_state.ranking_rules,
                 st.session_state.string_rules,
                 st.session_state.straightliner_rules
             )
+
+       st.download_button(
+                "⬇️ Download Master SPSS Syntax (.sps)",
+                master_spss_syntax,
+                "master_validation_script_knowledgeexcel.sps",
+                "text/plain"
+            )
             
-            st.success(f"Generated complete syntax for **{total_rules}** validation rules.")
-            
-            col_a, col_b = st.columns(2)
-            
-            with col_a:
-                st.download_button(
-                    label="⬇️ Download Master SPSS Syntax (.sps)",
-                    data=master_spss_syntax,
-                    file_name="master_validation_script_knowledgeexcel.sps",
-                    mime="text/plain"
-                )
+       st.code(
+                master_spss_syntax[:3000]
+                + "\n\n*(Preview truncated – download full file)*",
+                language="spss"
+            )
+    else:
+        st.info("Please define at least one validation rule in Step 2.")
             
             st.subheader("Preview of Generated Detailed SPSS Logic (Filter/Skip/Straightliner)")
             
