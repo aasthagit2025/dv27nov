@@ -139,15 +139,6 @@ def detect_variable_types(df):
         "ranking": sorted(set(ranking))
     }
 
-var_types = detect_variable_types(df_raw)
-
-st.session_state.var_sq = var_types["sq"]
-st.session_state.var_mq = var_types["mq"]
-st.session_state.var_oe = var_types["oe"]
-st.session_state.var_ranking = var_types["ranking"]
-
-
-
 # --- CORE UTILITY FUNCTIONS (SYNTAX GENERATION) ---
 
 def generate_skip_spss_syntax(target_col, trigger_col, trigger_val, rule_type, range_min=None, range_max=None):
@@ -1082,7 +1073,16 @@ if uploaded_file:
         st.session_state.all_cols = list(df_raw.columns.tolist())
         all_variable_options = ['-- Select Variable --'] + st.session_state.all_cols
         
+           
         st.markdown("---")
+        # ✅ CALL VARIABLE DETECTION HERE (AND ONLY HERE)
+        var_types = detect_variable_types(df_raw)
+
+        st.session_state.var_sq = var_types["sq"]
+        st.session_state.var_mq = var_types["mq"]
+        st.session_state.var_oe = var_types["oe"]
+        st.session_state.var_ranking = var_types["ranking"]
+
         st.header("Step 2: Define Validation Rules")
         
         col_side_a, col_side_b = st.sidebar.columns(2)
