@@ -319,7 +319,7 @@ def configure_sq_rules(all_variable_options):
     """Handles batch selection and sequential configuration of SQ rules."""
     st.subheader("1. Single Select / Rating Rule (SQ) Configuration")
     
-    sq_cols = st.multiselect("Select ALL Target Variables (Qx, Qx_i) for Single Select/Rating", st.session_state.all_cols, 
+    sq_cols = st.multiselect("Select ALL Target Variables (Qx, Qx_i) for Single Select/Rating", st.session_state.var_sqs, 
                              key='sq_batch_select_key', 
                              default=st.session_state.get('sq_batch_vars', []))
     
@@ -579,7 +579,7 @@ def configure_mq_rules(all_variable_options):
     st.subheader("3. Multi-Select Rule (MQ) Configuration")
     
     with st.expander("➕ Add Multi-Select Group Rule", expanded=False):
-        mq_cols = st.multiselect("Select ALL Multi-Select Variables in the Group (Qx_1, Qx_2, ...)", st.session_state.all_cols, 
+        mq_cols = st.multiselect("Select ALL Multi-Select Variables in the Group (Qx_1, Qx_2, ...)", st.session_state.var_mq, 
                                  key='mq_cols_select')
         
         if mq_cols:
@@ -704,7 +704,7 @@ def configure_string_rules(all_variable_options):
     # Step 1: Select OE variables
     selected = st.multiselect(
         "Select Open-End (OE) variables",
-        st.session_state.all_cols,
+        st.session_state.var_oe,
         default=st.session_state.string_batch_vars
     )
 
@@ -1102,13 +1102,13 @@ if uploaded_file:
 
 
         # New Configuration UIs
-        configure_sq_rules(all_variable_options)
+        configure_sq_rules(['-- Select Variable --'] + st.session_state.var_sq)
         st.markdown("---")
         configure_straightliner_rules()
         st.markdown("---")
-        configure_mq_rules(all_variable_options)
+        configure_mq_rules(['-- Select Variable --'] + st.session_state.var_mq)
         st.markdown("---")
-        configure_string_rules(all_variable_options)
+        onfigure_mq_rules(['-- Select Variable --'] + st.session_state.var_mq)
         st.markdown("---")
 
         st.header("Step 3: Generate Master Syntax")
