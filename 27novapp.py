@@ -692,7 +692,7 @@ def generate_string_spss_syntax(rule):
         generated_flags.extend(sl_flags)
         
     return syntax, generated_flags
-def configure_string_rules(['-- Select Variable --'] + st.session_state.var_oe)
+def configure_string_rules():
     """
     FINAL LOCKED VERSION
     - OE Skip UI is OUTSIDE the form (Streamlit-safe)
@@ -1105,8 +1105,6 @@ if uploaded_file:
         configure_sq_rules(['-- Select Variable --'] + st.session_state.var_sq)
         st.markdown("---")
         configure_straightliner_rules()
-        st.markdown("---")
-        configure_mq_rules(['-- Select Variable --'] + st.session_state.var_mq)
         st.markdown("---")
         configure_mq_rules(['-- Select Variable --'] + st.session_state.var_mq)
         st.markdown("---")
