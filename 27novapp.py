@@ -319,7 +319,7 @@ def configure_sq_rules(all_variable_options):
     """Handles batch selection and sequential configuration of SQ rules."""
     st.subheader("1. Single Select / Rating Rule (SQ) Configuration")
     
-    sq_cols = st.multiselect("Select ALL Target Variables (Qx, Qx_i) for Single Select/Rating", st.session_state.var_sqs, 
+    sq_cols = st.multiselect("Select ALL Target Variables (Qx, Qx_i) for Single Select/Rating", st.session_state.var_sq, 
                              key='sq_batch_select_key', 
                              default=st.session_state.get('sq_batch_vars', []))
     
@@ -363,7 +363,7 @@ def configure_sq_rules(all_variable_options):
                 other_stub_default = existing_rule.get('other_stub_val', 99)
                 
                 with col_other_var:
-                    other_var = st.selectbox("Corresponding 'Other Specify' Variable (Qx_OE/TEXT)", all_variable_options, 
+                    other_var = st.selectbox("Corresponding 'Other Specify' Variable (Qx_OE/TEXT)", ['-- Select Variable --'] + st.session_state.var_oe, 
                                              index=all_variable_options.index(other_var_default) if other_var_default in all_variable_options else 0, 
                                              key=f'{key_prefix}_other_var')
                 with col_other_stub:
@@ -377,7 +377,7 @@ def configure_sq_rules(all_variable_options):
                 
                 col_t_col, col_t_val = st.columns(2)
                 with col_t_col:
-                    skip_trigger_col = st.selectbox("**Filter/Trigger Variable** (e.g., Q0)", all_variable_options, 
+                    skip_trigger_col = st.selectbox("**Filter/Trigger Variable** (e.g., Q0)", ['-- Select Variable --'] + st.session_state.var_sq, 
                                                     index=all_variable_options.index(skip_trigger_col_default) if skip_trigger_col_default in all_variable_options else 0, 
                                                     key=f'{key_prefix}_t_col')
                 with col_t_val:
@@ -692,7 +692,7 @@ def generate_string_spss_syntax(rule):
         generated_flags.extend(sl_flags)
         
     return syntax, generated_flags
-def configure_string_rules(all_variable_options):
+def configure_string_rules(['-- Select Variable --'] + st.session_state.var_oe)
     """
     FINAL LOCKED VERSION
     - OE Skip UI is OUTSIDE the form (Streamlit-safe)
@@ -1108,7 +1108,7 @@ if uploaded_file:
         st.markdown("---")
         configure_mq_rules(['-- Select Variable --'] + st.session_state.var_mq)
         st.markdown("---")
-        onfigure_mq_rules(['-- Select Variable --'] + st.session_state.var_mq)
+        configure_mq_rules(['-- Select Variable --'] + st.session_state.var_mq)
         st.markdown("---")
 
         st.header("Step 3: Generate Master Syntax")
