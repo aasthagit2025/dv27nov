@@ -1126,18 +1126,17 @@ if uploaded_file:
         if total_rules == 0:
            st.warning("Please define and add at least one validation rule in Step 2.")
         else: 
-          
-          if st.button("🚀 Generate Master SPSS Syntax"):
-             master_spss_syntax = generate_master_spss_syntax(
-              st.session_state.sq_rules, 
-              st.session_state.mq_rules, 
-              st.session_state.ranking_rules, 
-              st.session_state.string_rules,
-              st.session_state.straightliner_rules
+           if st.button("🚀 Generate Master SPSS Syntax"):
+               master_spss_syntax = generate_master_spss_syntax(
+                  st.session_state.sq_rules, 
+                  st.session_state.mq_rules, 
+                  st.session_state.ranking_rules, 
+                  st.session_state.string_rules,
+                  st.session_state.straightliner_rules
             )            
             
-             st.session_state.master_spss_syntax = master_spss_syntax
-             st.success(f"Generated complete syntax for **{total_rules}** validation rules.")
+              st.session_state.master_spss_syntax = master_spss_syntax
+              st.success(f"Generated complete syntax for **{total_rules}** validation rules.")
 
         # ------------------------------
         # DOWNLOAD + PREVIEW (ONLY IF GENERATED)
