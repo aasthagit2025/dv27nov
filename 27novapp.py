@@ -1109,29 +1109,42 @@ if uploaded_file:
         configure_mq_rules(['-- Select Variable --'] + st.session_state.var_mq)
         st.markdown("---")
 
+
+
+
         st.header("Step 3: Generate Master Syntax")
         
-        total_rules = len(st.session_state.sq_rules) + len(st.session_state.mq_rules) + len(st.session_state.ranking_rules) + len(st.session_state.string_rules) + len(st.session_state.straightliner_rules)
+        total_rules =( 
+                     len(st.session_state.sq_rules) + len(st.session_state.mq_rules) +len(st.session_state.ranking_rules)+len(st.session_state.string_rules) + len(st.session_state.straightliner_rules)
         
-        if total_rules > 0:
-            
-            # --- Generate Master Outputs ---
+        if total_rules == 0:
+            st.warning("Please define and add at least one validation rule in Step 2."
+        else: 
+          
+          if st.button("🚀 Generate Master SPSS Syntax"):
             master_spss_syntax = generate_master_spss_syntax(
-                st.session_state.sq_rules, 
-                st.session_state.mq_rules, 
-                st.session_state.ranking_rules, 
-                st.session_state.string_rules,
-                st.session_state.straightliner_rules
-            )
+            st.session_state.sq_rules, 
+            st.session_state.mq_rules, 
+            st.session_state.ranking_rules, 
+            st.session_state.string_rules,
+            st.session_state.straightliner_rules
+            )            
             
+            st.session_state.master_spss_syntax = master_spss_syntax
             st.success(f"Generated complete syntax for **{total_rules}** validation rules.")
+
+        # ------------------------------
+        # DOWNLOAD + PREVIEW (ONLY IF GENERATED)
+        # ------------------------------
+        if "master_spss_syntax" in st.session_state:
             
             col_a, col_b = st.columns(2)
             
             with col_a:
+
                 st.download_button(
                     label="⬇️ Download Master SPSS Syntax (.sps)",
-                    data=master_spss_syntax,
+                    data=st.session_state.master_spss_syntax,
                     file_name="master_validation_script_knowledgeexcel.sps",
                     mime="text/plain"
                 )
