@@ -100,7 +100,7 @@ def load_data_file(uploaded_file):
         raise Exception(f"Unsupported file format: {file_extension}. Please upload CSV, Excel (.xlsx/.xls), or SPSS (.sav/.zsav).")
 
 
-@st.cache_data(show_spinner=False)
+@st.cache_data
 def detect_variable_types(df):
     sq = []
     mq = []
@@ -1103,6 +1103,8 @@ if uploaded_file:
 
         # New Configuration UIs
         configure_sq_rules(['-- Select Variable --'] + st.session_state.var_sq)
+        st.markdown("---")
+        configure_string_rules()
         st.markdown("---")
         configure_straightliner_rules()
         st.markdown("---")
