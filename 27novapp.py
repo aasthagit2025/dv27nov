@@ -1132,7 +1132,7 @@ if uploaded_file:
                    st.session_state.mq_rules, 
                    st.session_state.ranking_rules, 
                    st.session_state.string_rules,
-                  	st.session_state.straightliner_rules
+                      st.session_state.straightliner_rules
             )            
             
               st.session_state.master_spss_syntax = master_spss_syntax
