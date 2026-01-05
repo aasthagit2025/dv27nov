@@ -1135,7 +1135,7 @@ if uploaded_file:
                       st.session_state.straightliner_rules
             )            
             
-        st.session_state.master_spss_syntax = master_spss_sy
+        st.session_state.master_spss_syntax = master_spss_syntax
         st.success(f"Generated complete syntax for **{total_rules}** validation rules.")
 
         # ------------------------------
@@ -1155,6 +1155,13 @@ if uploaded_file:
                 )
             
             st.subheader("Preview of Generated Detailed SPSS Logic (Filter/Skip/Straightliner)")
+            preview_text = "\n".join(
+        st.session_state.master_spss_syntax.split("\n")[:40]
+    )
+            st.code(
+        preview_text + "\n\n*(Download full .sps for complete syntax)*",
+        language="spss"
+    )
             
             preview_syntax_list = []
             
