@@ -1124,7 +1124,7 @@ if uploaded_file:
         )
         
         if total_rules == 0:
-           st.warning("Please define and add at least one validation rule in Step 2."
+           st.warning("Please define and add at least one validation rule in Step 2.")
         else: 
           
           if st.button("🚀 Generate Master SPSS Syntax"):
