@@ -1135,8 +1135,8 @@ if uploaded_file:
                       st.session_state.straightliner_rules
             )            
             
-              st.session_state.master_spss_syntax = master_spss_syntax
-              st.success(f"Generated complete syntax for **{total_rules}** validation rules.")
+        st.session_state.master_spss_syntax = master_spss_sy
+        st.success(f"Generated complete syntax for **{total_rules}** validation rules.")
 
         # ------------------------------
         # DOWNLOAD + PREVIEW (ONLY IF GENERATED)
