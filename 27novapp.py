@@ -9,8 +9,8 @@ import tempfile # NEW: Required for the robust SPSS file handling fix
 # --- Configuration ---
 FLAG_PREFIX = "xx" 
 st.set_page_config(layout="wide")
-st.title("📊 Survey Data Validation Automation (Variable-Centric Model)")
-st.markdown("Generates **KnowledgeExcel-compatible SPSS `IF` logic syntax** (`xx` prefix) by allowing **batch selection** and **sequential rule configuration**.")
+st.title("📊 Survey Data Validation Automation")
+st.markdown("Generates **KnowledgeExcel-compatible SPSS syntax.")
 st.markdown("---")
 
 # Initialize state for storing final, configured rules
@@ -486,7 +486,7 @@ def generate_straightliner_spss_syntax(cols):
 # NEW FUNCTION: Configure Straightliner Rules
 def configure_straightliner_rules():
     """Handles the configuration of Straightliner checks for rating grids."""
-    st.subheader("2. Straightliner Check (Rating Grids) Configuration")
+    st.subheader("4. Straightliner Check (Rating Grids) Configuration")
     
     with st.expander("➕ Add Straightliner Group Rule", expanded=False):
         straightliner_cols = st.multiselect("Select ALL Variables in the Rating Grid (Qx_1, Qx_2, ...)", st.session_state.all_cols, 
@@ -699,7 +699,7 @@ def generate_string_spss_syntax(rule):
     - Skip UI will NEVER disappear again
     """
 
-    st.subheader("4. String / Open-End (OE) Configuration")
+    st.subheader("2. String / Open-End (OE) Configuration")
 
     # Step 1: Select OE variables
     selected = st.multiselect(
