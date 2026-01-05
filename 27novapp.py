@@ -692,7 +692,7 @@ def generate_string_spss_syntax(rule):
         generated_flags.extend(sl_flags)
         
     return syntax, generated_flags
-def configure_string_rules():
+    configure_string_rules()
     """
     FINAL LOCKED VERSION
     - OE Skip UI is OUTSIDE the form (Streamlit-safe)
@@ -1137,7 +1137,7 @@ if uploaded_file:
                       st.session_state.straightliner_rules
             )            
             
-        st.session_state.master_spss_syntax = master_spss_syntax
+        
         st.success(f"Generated complete syntax for **{total_rules}** validation rules.")
 
         # ------------------------------
