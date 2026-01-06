@@ -486,7 +486,7 @@ def generate_straightliner_spss_syntax(cols):
 # NEW FUNCTION: Configure Straightliner Rules
 def configure_straightliner_rules():
     """Handles the configuration of Straightliner checks for rating grids."""
-    st.subheader("4. Straightliner Check (Rating Grids) Configuration")
+    st.subheader("3. Straightliner Check (Rating Grids) Configuration")
     
     with st.expander("➕ Add Straightliner Group Rule", expanded=False):
         straightliner_cols = st.multiselect("Select ALL Variables in the Rating Grid (Qx_1, Qx_2, ...)", st.session_state.all_cols, 
@@ -576,7 +576,7 @@ def generate_mq_spss_syntax(rule):
 
 def configure_mq_rules(all_variable_options):
     """Handles configuration of MQ rules."""
-    st.subheader("3. Multi-Select Rule (MQ) Configuration")
+    st.subheader("4. Multi-Select Rule (MQ) Configuration")
     
     with st.expander("➕ Add Multi-Select Group Rule", expanded=False):
         mq_cols = st.multiselect("Select ALL Multi-Select Variables in the Group (Qx_1, Qx_2, ...)", st.session_state.var_mq, 
