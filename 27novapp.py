@@ -574,86 +574,151 @@ def generate_mq_spss_syntax(rule):
 
     return syntax, generated_flags
 
+def get_mq_group_from_one(selected_var, all_mq_vars):
+    """
+    Given one MQ variable (e.g. A1_1),
+    return the full MQ group (A1_1 ... A1_n)
+    """
+    if not selected_var:
+        return []
+
+    base = selected_var.split("_")[0]
+    return sorted([v for v in all_mq_vars if v.startswith(base + "_")])
+
+
 def configure_mq_rules(all_variable_options):
-    """Handles configuration of MQ rules."""
-    st.subheader("4. Multi-Select Rule (MQ) Configuration")
+    """Handles configuration of MQ rules with auto-grouping."""
     
+    st.subheader("4. Multi-Select Rule (MQ) Configuration")
+
     with st.expander("➕ Add Multi-Select Group Rule", expanded=False):
-        mq_cols = st.multiselect("Select ALL Multi-Select Variables in the Group (Qx_1, Qx_2, ...)", st.session_state.var_mq, 
-                                 key='mq_cols_select')
-        
+
+        # STEP A: pick ONE variable
+        mq_trigger_var = st.selectbox(
+            "Select ANY ONE variable from the MQ group (e.g. A1_1)",
+            ['-- Select Variable --'] + st.session_state.var_mq,
+            key="mq_trigger_var"
+        )
+
+        # STEP B: auto-detect group
+        if mq_trigger_var != '-- Select Variable --':
+            mq_cols = get_mq_group_from_one(
+                mq_trigger_var,
+                st.session_state.var_mq
+            )
+
+            st.info(
+                f"Auto-detected MQ group ({len(mq_cols)} variables): "
+                + ", ".join(mq_cols)
+            )
+        else:
+            mq_cols = []
+
+        # STEP C: show config ONLY if group exists
         if mq_cols:
             mq_set_name = mq_cols[0].split('_')[0]
-            
+
             with st.form(f"mq_form_{mq_set_name}"):
+
                 st.markdown(f"### ⚙️ Rule Configuration for Group: **{mq_set_name}**")
-                
+
                 # A. Count Check
                 col_a, col_b, col_c = st.columns(3)
                 with col_a:
-                    min_count = st.number_input("Minimum Selections Required", min_value=0, value=1, key=f'mq_min_{mq_set_name}')
+                    min_count = st.number_input(
+                        "Minimum Selections Required",
+                        min_value=0,
+                        value=1,
+                        key=f"mq_min_{mq_set_name}"
+                    )
                 with col_b:
-                    max_count = st.number_input("Maximum Selections Allowed (0 for no max)", min_value=0, key=f'mq_max_{mq_set_name}')
+                    max_count = st.number_input(
+                        "Maximum Selections Allowed (0 = no max)",
+                        min_value=0,
+                        value=0,
+                        key=f"mq_max_{mq_set_name}"
+                    )
                 with col_c:
-                    count_method = st.radio("SPSS Calculation Method", ["SUM", "COUNT"], index=0, key=f'mq_method_{mq_set_name}')
-                
-                # B. Exclusive Stub Check
-                exclusive_col = st.selectbox("Select Exclusive Stub Variable (Optional)", ['None'] + mq_cols, key=f'mq_exclusive_{mq_set_name}')
-                
-                # C. Other Specify Check
-                st.markdown("#### C. Other Specify Check (Requires a checkbox variable and a text variable)")
+                    count_method = st.radio(
+                        "SPSS Calculation Method",
+                        ["SUM", "COUNT"],
+                        index=0,
+                        key=f"mq_method_{mq_set_name}"
+                    )
+
+                # B. Exclusive Stub
+                exclusive_col = st.selectbox(
+                    "Exclusive Stub Variable (Optional)",
+                    ['None'] + mq_cols,
+                    key=f"mq_exclusive_{mq_set_name}"
+                )
+
+                # C. Other Specify
+                st.markdown("#### C. Other Specify Check")
                 col_o_chk, col_o_txt, col_o_stub = st.columns(3)
                 with col_o_chk:
-                    other_checkbox_col = st.selectbox("Checkbox Column for 'Other' (Qx_i)", ['None'] + mq_cols, key=f'mq_other_chk_{mq_set_name}')
+                    other_checkbox_col = st.selectbox(
+                        "Checkbox Column (Qx_i)",
+                        ['None'] + mq_cols,
+                        key=f"mq_other_chk_{mq_set_name}"
+                    )
                 with col_o_txt:
-                    other_var = st.selectbox("Corresponding 'Other Specify' Variable (Qx_OE/TEXT)", ['None'] + [c for c in all_variable_options if c != '-- Select Variable --'], key=f'mq_other_txt_{mq_set_name}')
+                    other_var = st.selectbox(
+                        "Other Specify Text Variable",
+                        ['None'] + st.session_state.var_oe,
+                        key=f"mq_other_txt_{mq_set_name}"
+                    )
                 with col_o_stub:
-                     other_stub_val = st.number_input("Stub Value for 'Other' (Usually 1)", min_value=1, value=1, key=f'mq_other_stub_{mq_set_name}')
+                    other_stub_val = st.number_input(
+                        "Stub Value for Other",
+                        min_value=1,
+                        value=1,
+                        key=f"mq_other_stub_{mq_set_name}"
+                    )
 
                 # D. Skip Logic
-                st.markdown("#### D. Skip Logic Filter Condition (EoO/EoC Check)")
-                
-                existing_rule = next((r for r in st.session_state.mq_rules if r.get('variables') == mq_cols), {})
+                st.markdown("#### D. Skip Logic")
+                run_skip = st.checkbox(
+                    "Enable Skip Logic",
+                    value=False,
+                    key=f"mq_run_skip_{mq_set_name}"
+                )
 
-                run_skip_default = existing_rule.get('run_skip', False)
-                skip_trigger_col_default = existing_rule.get('trigger_col') or '-- Select Variable --'
-                skip_trigger_val_default = existing_rule.get('trigger_val') or '1'
-
-                run_skip = st.checkbox(f"Enable Skip Logic Check (Creates Flag_Qx and xxQx=1/2)", value=run_skip_default, key=f'mq_run_skip_{mq_set_name}')
-                
                 if run_skip:
-                    with st.container(border=True):
-                        st.info(f"*Define the condition that means **{mq_set_name}** should have been answered (e.g., Q_Prev=1).")
-                        col_t_col, col_t_val = st.columns(2)
-                        with col_t_col:
-                            skip_trigger_col = st.selectbox("**Filter/Trigger Variable** (e.g., Q0)", all_variable_options, 
-                                                            index=all_variable_options.index(skip_trigger_col_default) if skip_trigger_col_default in all_variable_options else 0, key=f'mq_t_col_{mq_set_name}')
-                        with col_t_val:
-                            skip_trigger_val = st.text_input("**Filter Condition Value** (e.g., 1)", value=skip_trigger_val_default, key=f'mq_t_val_{mq_set_name}')
+                    col_t_col, col_t_val = st.columns(2)
+                    with col_t_col:
+                        skip_trigger_col = st.selectbox(
+                            "Filter Variable",
+                            all_variable_options,
+                            key=f"mq_tcol_{mq_set_name}"
+                        )
+                    with col_t_val:
+                        skip_trigger_val = st.text_input(
+                            "Trigger Value",
+                            value="1",
+                            key=f"mq_tval_{mq_set_name}"
+                        )
                 else:
                     skip_trigger_col = '-- Select Variable --'
                     skip_trigger_val = '1'
 
-
+                # SAVE
                 if st.form_submit_button("✅ Save MQ Group Rule"):
-                    if mq_cols:
-                        st.session_state.mq_rules.append({
-                            'variables': mq_cols,
-                            'min_count': min_count,
-                            'max_count': max_count if max_count > 0 else None,
-                            'exclusive_col': exclusive_col,
-                            'count_method': count_method,
-                            'other_var': other_var if other_var != 'None' and other_checkbox_col != 'None' else None,
-                            'other_checkbox_col': other_checkbox_col if other_checkbox_col != 'None' else None,
-                            'other_stub_val': other_stub_val,
-                            'run_skip': run_skip and skip_trigger_col != '-- Select Variable --',
-                            'trigger_col': skip_trigger_col,
-                            'trigger_val': skip_trigger_val,
-                        })
-                        st.success(f"MQ Rule added for group starting with **{mq_cols[0]}**.")
-                        
-                    else:
-                        st.warning("Please select columns for the MQ group.")
+                    st.session_state.mq_rules.append({
+                        'variables': mq_cols,
+                        'min_count': min_count,
+                        'max_count': max_count if max_count > 0 else None,
+                        'exclusive_col': exclusive_col,
+                        'count_method': count_method,
+                        'other_var': other_var if other_var != 'None' else None,
+                        'other_checkbox_col': other_checkbox_col if other_checkbox_col != 'None' else None,
+                        'other_stub_val': other_stub_val,
+                        'run_skip': run_skip and skip_trigger_col != '-- Select Variable --',
+                        'trigger_col': skip_trigger_col,
+                        'trigger_val': skip_trigger_val,
+                    })
+
+                    st.success(f"MQ Rule saved for group **{mq_set_name}**")
 
 def generate_string_spss_syntax(rule):
     """
