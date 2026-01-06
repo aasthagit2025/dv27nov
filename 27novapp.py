@@ -7,7 +7,6 @@ import os
 import tempfile # NEW: Required for the robust SPSS file handling fix
 
 # --- Configuration ---
-st.write("🔄 Script reran at:", time.time())
 FLAG_PREFIX = "xx" 
 st.set_page_config(layout="wide")
 st.title("📊 Survey Data Validation Automation")
@@ -1077,14 +1076,16 @@ if uploaded_file:
            
         st.markdown("---")
         # ✅ CALL VARIABLE DETECTION HERE (AND ONLY HERE)
-        var_types = detect_variable_types(df_raw)
-
+        if "var_types" not in st.session_state:
+            st.session_state.var_types = detect_variable_types(df_raw) 
         st.session_state.var_sq = var_types["sq"]
         st.session_state.var_mq = var_types["mq"]
         st.session_state.var_oe = var_types["oe"]
         st.session_state.var_ranking = var_types["ranking"]
-
+        
+        
         st.header("Step 2: Define Validation Rules")
+
         
         col_side_a, col_side_b = st.sidebar.columns(2)
         with col_side_a:
