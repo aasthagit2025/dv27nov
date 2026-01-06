@@ -1076,12 +1076,12 @@ if uploaded_file:
            
         st.markdown("---")
         # ✅ CALL VARIABLE DETECTION HERE (AND ONLY HERE)
-        if "var_types" not in st.session_state:
-            st.session_state.var_types = detect_variable_types(df_raw) 
-        st.session_state.var_sq = var_types["sq"]
-        st.session_state.var_mq = var_types["mq"]
-        st.session_state.var_oe = var_types["oe"]
-        st.session_state.var_ranking = var_types["ranking"]
+        if "var_types" not in st.session_state: st.session_state.var_types = detect_variable_types(df_raw) 
+        
+        st.session_state.var_sq = st.session_state.var_typess["sq"]    
+        st.session_state.var_mq = st.session_state.var_types["mq"]
+        st.session_state.var_oe = st.session_state.var_types["oe"]
+        st.session_state.var_ranking = st.session_state.var_types["ranking"]
         
         
         st.header("Step 2: Define Validation Rules")
