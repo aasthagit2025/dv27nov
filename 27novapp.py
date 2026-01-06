@@ -1,4 +1,3 @@
-st.write("🔄 Script reran at:", time.time())
 import streamlit as st
 import pandas as pd
 import numpy as np
@@ -8,10 +7,11 @@ import os
 import tempfile # NEW: Required for the robust SPSS file handling fix
 
 # --- Configuration ---
+st.write("🔄 Script reran at:", time.time())
 FLAG_PREFIX = "xx" 
 st.set_page_config(layout="wide")
 st.title("📊 Survey Data Validation Automation")
-st.markdown("Generates **KnowledgeExcel-compatible SPSS syntax**.")
+st.markdown("Generates **KnowledgeExcel-compatible SPSS syntax**")
 st.markdown("---")
 
 # Initialize state for storing final, configured rules
