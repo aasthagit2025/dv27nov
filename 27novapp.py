@@ -450,7 +450,7 @@ def configure_sq_rules(all_variable_options):
                     
                 st.success(f"Successfully saved {len(new_sq_rules)} SQ rules.")
                 st.session_state.sq_batch_vars = [] 
-                st.rerun()
+                
             else:
                 st.markdown("Submit the form above to save the configured rules.")
 
@@ -508,7 +508,7 @@ def configure_straightliner_rules():
                             'group_name': group_name,
                         })
                         st.success(f"Straightliner Rule added for group **{group_name}**.")
-                        st.rerun()
+                        
                     else:
                         st.warning("Please select at least two columns for the Straightliner check.")
 
@@ -651,7 +651,7 @@ def configure_mq_rules(all_variable_options):
                             'trigger_val': skip_trigger_val,
                         })
                         st.success(f"MQ Rule added for group starting with **{mq_cols[0]}**.")
-                        st.rerun()
+                        
                     else:
                         st.warning("Please select columns for the MQ group.")
 
@@ -785,7 +785,7 @@ def configure_string_rules():
                 }]
 
                 st.success(f"Saved OE rule for {col}")
-                st.rerun()
+                
 
 
 # Ranking functions remain here...
@@ -990,7 +990,7 @@ def delete_rule(rule_type, index):
         del st.session_state.string_rules[index]
     elif rule_type == 'straightliner': 
         del st.session_state.straightliner_rules[index]
-    st.rerun() 
+    
 
 def display_rules(rules, columns, header, rule_type):
     if rules:
@@ -1104,7 +1104,7 @@ if uploaded_file:
         # New Configuration UIs
         configure_sq_rules(['-- Select Variable --'] + st.session_state.var_sq)
         st.markdown("---")
-        configure_string_rules()
+        configure_string_rules(['-- Select Variable --'] + st.session_state.all_cols)
         st.markdown("---")
         configure_straightliner_rules()
         st.markdown("---")
@@ -1126,7 +1126,7 @@ if uploaded_file:
         )
         
         if total_rules == 0:
-            st.warning("Please define and add at least one validation rule in Step 2.")
+            st.info("Configure rules in Step 2 to enable syntax generation.")
         else: 
            if st.button("🚀 Generate Master SPSS Syntax"):
               st.session_state.master_spss_syntax = generate_master_spss_syntax(
@@ -1136,18 +1136,19 @@ if uploaded_file:
               st.session_state.string_rules,
               st.session_state.straightliner_rules
               )
-              st.success(f"Generated complete syntax for **{total_rules}** validation rules.")
+              st.success("Master syntax generated.")
 
         # ------------------------------
         # DOWNLOAD + PREVIEW (ONLY IF GENERATED)
         # ------------------------------
-        if "master_spss_syntax" in st.session_state:
+        if st.session_state.get("master_spss_syntax"):
             
-            col_a, col_b = st.columns(2)
+            st.markdown("---")
+            st.subheader("Preview of Generated SPSS Logic")
             
-            with col_a:
+            
 
-                st.download_button(
+            st.download_button(
                     label="⬇️ Download Master SPSS Syntax (.sps)",
                     data=st.session_state.master_spss_syntax,
                     file_name="master_validation_script_knowledgeexcel.sps",
@@ -1162,10 +1163,9 @@ if uploaded_file:
         preview_text + "\n\n*(Download full .sps for complete syntax)*",
         language="spss"
     )
- 
-            
-        
-    except Exception as e:x 
+
+     
+    except Exception as e:
         # A clearer error message for the user after the fixes
-    st.error(f"A critical error occurred during file processing or setup. Error: {e}")
-    st.exception(e) # Show full traceback for debugging if needed
+       st.error(f"A critical error occurred during file processing or setup. Error: {e}")
+       st.exception(e) # Show full traceback for debugging if needed
