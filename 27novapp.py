@@ -1104,7 +1104,7 @@ if uploaded_file:
         # New Configuration UIs
         configure_sq_rules(['-- Select Variable --'] + st.session_state.var_sq)
         st.markdown("---")
-        configure_string_rules(['-- Select Variable --'] + st.session_state.all_cols)
+        configure_string_rules()
         st.markdown("---")
         configure_straightliner_rules()
         st.markdown("---")
