@@ -157,7 +157,7 @@ def generate_skip_spss_syntax(target_col, trigger_col, trigger_val, rule_type, r
     syntax = []
     
     # Stage 1: Filter Flag (Flag_Qx)
-    syntax.append(f"**************************************SKIP LOGIC FILTER FLAG: {trigger_col}={trigger_val} -> {target_clean}")
+    syntax.append(f"**************************************SKIP LOGIC FILTER FLAG: {trigger_col}={trigger_val} -> {target_clean}.")
     syntax.append(f"* Qx should ONLY be asked if {trigger_col} = {trigger_val}.")
     syntax.append(f"IF({trigger_col} = {trigger_val}) {filter_flag}=1.")
     syntax.append(f"EXECUTE.\n") 
@@ -177,7 +177,7 @@ def generate_skip_spss_syntax(target_col, trigger_col, trigger_val, rule_type, r
         eoc_condition = f"~miss({target_col})" 
         
     # --- EoO/EoC Logic ---
-    syntax.append(f"**************************************SKIP LOGIC EoO/EoC CHECK: {target_col} -> {final_error_flag}")
+    syntax.append(f"**************************************SKIP LOGIC EoO/EoC CHECK: {target_col} -> {final_error_flag}.")
     
     # Error of Omission (EoO) - Flag=1
     syntax.append(f"* EoO (1): Trigger Met ({filter_flag}=1), Target Fails Check/Missing/Out-of-Range/Empty.")
@@ -212,7 +212,7 @@ def generate_other_specify_spss_syntax(main_col, other_col, other_stub_val):
     syntax.append(f"EXECUTE.\n")
     
     # Reverse Check (Other answered, Main not selected) - EoC type check
-    syntax.append(f"**************************************OTHER SPECIFY (Reverse) Check: {other_col} has data AND {main_col}<>{other_stub_val}")
+    syntax.append(f"**************************************OTHER SPECIFY (Reverse) Check: {other_col} has data AND {main_col}<>{other_stub_val}.")
     syntax.append(f"* EoC (2): Other has data (~miss({other_col}) & {other_col}<>''), Main not selected.")
     syntax.append(f"IF(~miss({other_col}) & {other_col}<>'' & {main_col}<>{other_stub_val}) {flag_name_rev}=1.")
     syntax.append(f"EXECUTE.\n")
@@ -228,7 +228,7 @@ def generate_piping_spss_syntax(target_col, overall_skip_filter_flag, piping_sou
     flag_col = f"{FLAG_PREFIX}{target_col}" 
     
     # 1. Error of Omission (EOO) - Target is missing/wrong when piping condition is met
-    syntax.append(f"**************************************PIPING (EOO) Check: (Filter={overall_skip_filter_flag}=1) AND ({piping_source_col}={piping_stub_val}) AND {target_col}<>{piping_stub_val}")
+    syntax.append(f"**************************************PIPING (EOO) Check: (Filter={overall_skip_filter_flag}=1) AND ({piping_source_col}={piping_stub_val}) AND {target_col}<>{piping_stub_val}.")
     syntax.append(f"* EoO (1): Piping/Skip met, Target value is wrong/missing. IF(((Flag_Q12=1) & Q11=1 ) & Q12_1<>1)xxQ12_1=1.")
     syntax.append(f"IF(({overall_skip_filter_flag}=1) & ({piping_source_col}={piping_stub_val}) & {target_col}<>{piping_stub_val}) {flag_col}=1.")
     
@@ -264,7 +264,7 @@ def generate_sq_spss_syntax(rule):
     # 1. Missing/Range Check 
     if not rule['run_piping_check']:
         flag_name = f"{FLAG_PREFIX}{col}_Rng"
-        syntax.append(f"**************************************SQ Missing/Range Check: {col} (Range: {min_val} to {max_val})")
+        syntax.append(f"**************************************SQ Missing/Range Check: {col} (Range: {min_val} to {max_val}).")
         syntax.append(f"IF(miss({col}) | ~range({col},{min_val},{max_val})) {flag_name}=1.")
         syntax.append(f"EXECUTE.\n")
         generated_flags.append(flag_name)
@@ -273,7 +273,7 @@ def generate_sq_spss_syntax(rule):
     if required_stubs_list:
         stubs_str = ', '.join(map(str, required_stubs_list))
         flag_any = f"{FLAG_PREFIX}{col}_Any"
-        syntax.append(f"**************************************SQ Specific Stub Check (Not IN Acceptable List): {col} (Accept: {stubs_str})")
+        syntax.append(f"**************************************SQ Specific Stub Check (Not IN Acceptable List): {col} (Accept: {stubs_str}).")
         syntax.append(f"IF(~miss({col}) & NOT(any({col}, {stubs_str}))) {flag_any}=1.")
         syntax.append(f"EXECUTE.\n")
         generated_flags.append(flag_any)
@@ -291,7 +291,7 @@ def generate_sq_spss_syntax(rule):
         trigger_val = rule['trigger_val']
         
         # B. Generate Filter Flag (Flag_Qx)
-        syntax.append(f"**************************************SQ Filter Flag for Skip/Piping: {filter_flag}")
+        syntax.append(f"**************************************SQ Filter Flag for Skip/Piping: {filter_flag}.")
         syntax.append(f"* Filter for {target_clean}: {trigger_col} = {trigger_val}.")
         syntax.append(f"IF({trigger_col} = {trigger_val}) {filter_flag}=1.")
         syntax.append(f"EXECUTE.\n")
@@ -317,7 +317,7 @@ def generate_sq_spss_syntax(rule):
 
 def configure_sq_rules(all_variable_options):
     """Handles batch selection and sequential configuration of SQ rules."""
-    st.subheader("1. Single Select / Rating Rule (SQ) Configuration")
+    st.subheader("1. Single Select / Rating Rule (SQ) Configuration.")
     
     sq_cols = st.multiselect("Select ALL Target Variables (Qx, Qx_i) for Single Select/Rating", st.session_state.var_sq, 
                              key='sq_batch_select_key', 
