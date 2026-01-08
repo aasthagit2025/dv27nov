@@ -1023,7 +1023,7 @@ def generate_master_spss_syntax(sq_rules, mq_rules, ranking_rules, string_rules,
             sps_content.append("\nDELETE VARIABLES T_*.")
             sps_content.append("EXECUTE.")
             
-            sps_content.append("\n* --- 4. VALIDATION REPORT (Frequencies) --- *")
+            sps_content.append("\n* --- 4. VALIDATION REPORT (Frequencies) --- *.")
             sps_content.append(f"FREQUENCIES VARIABLES=Master_Reject_Count {'; '.join(error_flags_to_count)} /STATISTICS=COUNT MEAN.")
         
     return "\n".join(sps_content)
