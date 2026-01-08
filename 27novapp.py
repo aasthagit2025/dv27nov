@@ -935,7 +935,7 @@ def generate_master_spss_syntax(sq_rules, mq_rules, ranking_rules, string_rules,
     sps_content.append(f"* PYTHON-GENERATED DATA VALIDATION SCRIPT (KNOWLEDGEEXCEL FORMAT) *")
     sps_content.append(f"*{'='*60}*\n")
     sps_content.append("DATASET ACTIVATE ALL.")
-    sps_content.append("\n* --- 0. INITIALIZE FLAGS --- *")
+    sps_content.append("\n* --- 0. INITIALIZE FLAGS --- *.")
     
     unique_flag_names = sorted(list(set(all_flag_cols)))
     
@@ -968,11 +968,11 @@ def generate_master_spss_syntax(sq_rules, mq_rules, ranking_rules, string_rules,
     sps_content.append("EXECUTE.\n")
     
     # 1. Insert ALL detailed validation logic
-    sps_content.append("\n\n* --- 1. DETAILED VALIDATION LOGIC --- *")
+    sps_content.append("\n\n* --- 1. DETAILED VALIDATION LOGIC --- *.")
     sps_content.append("\n".join([item for sublist in all_syntax_blocks for item in sublist]))
     
     # 2. Add Value Labels & Master Flags
-    sps_content.append("\n* --- 2. VALUE LABELS & VARIABLE INITIALIZATION --- *")
+    sps_content.append("\n* --- 2. VALUE LABELS & VARIABLE INITIALIZATION --- *.")
     
     for flag in unique_flag_names:
         
@@ -993,7 +993,7 @@ def generate_master_spss_syntax(sq_rules, mq_rules, ranking_rules, string_rules,
     # 3. Compute a Master Reject Flag
     master_error_flags = [f for f in unique_flag_names if f.startswith(FLAG_PREFIX) or f.startswith('Flag_')]
     
-    sps_content.append("\n* --- 3. MASTER REJECT COUNT COMPUTATION --- *")
+    sps_content.append("\n* --- 3. MASTER REJECT COUNT COMPUTATION --- *.")
     if master_error_flags:
         temp_flag_logic = []
         
@@ -1001,7 +1001,7 @@ def generate_master_spss_syntax(sq_rules, mq_rules, ranking_rules, string_rules,
         error_flags_to_count = [f for f in master_error_flags if f.startswith(FLAG_PREFIX) and not f.endswith('_Count')]
         
         if error_flags_to_count:
-            sps_content.append("\n*--- Temporary Binary Flags for Counting ---*")
+            sps_content.append("\n*--- Temporary Binary Flags for Counting ---*.")
             
             # Use COMPUTE / IF for temporary flags to handle the mix of 0/1 and 0/1/2 flags correctly
             sps_content.append(f"NUMERIC {'; '.join([f'T_{f}' for f in error_flags_to_count])}.")
