@@ -1126,7 +1126,7 @@ st.header("Step 1: Upload Survey Data File (CSV, Excel, or SPSS)")
 # UPDATED file uploader to include SPSS file types (.sav, .zsav)
 uploaded_file = st.file_uploader(
     "Choose a Survey Data File", 
-    type=['csv', 'xlsx', 'xls', 'sav', 'zsav'] 
+    type=['csv', 'xlsx', 'xls', 'sav'] 
 )
 
 if uploaded_file:
