@@ -139,6 +139,24 @@ def detect_variable_types(df):
         "ranking": sorted(set(ranking))
     }
 
+def get_mq_group_from_one(selected_var, all_mq_vars):
+    """
+    Given one MQ variable (e.g. A1_1),
+    return all variables in the same group (A1_1, A1_2, ...).
+    """
+    if not selected_var or '_' not in selected_var:
+        return []
+
+    prefix = selected_var.split('_')[0]
+
+    group = [
+        v for v in all_mq_vars
+        if v.startswith(prefix + "_")
+    ]
+
+    return sorted(group)
+
+
 # --- CORE UTILITY FUNCTIONS (SYNTAX GENERATION) ---
 
 def generate_skip_spss_syntax(target_col, trigger_col, trigger_val, rule_type, range_min=None, range_max=None):
