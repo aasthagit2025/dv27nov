@@ -981,7 +981,7 @@ def generate_master_spss_syntax(sq_rules, mq_rules, ranking_rules, string_rules,
     unique_flag_names = sorted(list(set(all_flag_cols)))
     
     # Filter for flags that need initialization (excluding counts/temp vars)
-    init_flags_0 = [f for f in unique_flag_names if f.startswith(FLAG_PREFIX) and not f.endswith(('_Count', '_Miss', '_Junk'))]
+    init_flags_0 = [f for f in unique_flag_names if f.startswith(FLAG_PREFIX) and not f.endswith(( '_Miss', '_Junk'))]
     intermediate_flags = [f for f in unique_flag_names if f.startswith('Flag_')]
     
     all_numeric_flags = init_flags_0 + intermediate_flags
@@ -1021,7 +1021,7 @@ def generate_master_spss_syntax(sq_rules, mq_rules, ranking_rules, string_rules,
             # General 'Fail: Data Check' for non-EoO/EoC flags
             sps_content.append(f"VALUE LABELS {flag} 0 'Pass' 1 'Fail: Data Check'.")
             
-        elif flag.startswith(FLAG_PREFIX) and not flag.endswith('_Count'):
+        elif flag.startswith(FLAG_PREFIX) and flag.endswith(('_Sum','_Count')):
             # EoO/EoC flags (xxQx)
             sps_content.append(f"VALUE LABELS {flag} 0 'Pass' 1 'Fail: Error of Omission (EOO)' 2 'Fail: Error of Commission (EoC)'.")
         
@@ -1039,7 +1039,7 @@ def generate_master_spss_syntax(sq_rules, mq_rules, ranking_rules, string_rules,
         temp_flag_logic = []
         
         # Only count final error flags (xx prefix, excluding calculated counts)
-        error_flags_to_count = [f for f in master_error_flags if f.startswith(FLAG_PREFIX) and not f.endswith('_Count')]
+        error_flags_to_count = [f for f in master_error_flags if f.startswith(FLAG_PREFIX)]
         
         if error_flags_to_count:
             sps_content.append("\n*--- Temporary Binary Flags for Counting ---*.")
