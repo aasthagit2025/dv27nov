@@ -526,21 +526,21 @@ def generate_mq_spss_syntax(rule):
     generated_flags = []
     
     # 1. Count Calculation
-    syntax.append(f"**************************************MQ Count Calculation for Set: {mq_set_name} (Method: {calc_func})")
+    syntax.append(f"**************************************MQ Count Calculation for Set: {mq_set_name} (Method: {calc_func}).")
     syntax.append(f"COMPUTE {mq_sum_var} = {calc_func}({mq_list_str}).") 
     syntax.append(f"EXECUTE.\n")
     generated_flags.append(mq_sum_var)
     
     # 2. Min/Max Count Check
     flag_min = f"{FLAG_PREFIX}{mq_set_name}_Min"
-    syntax.append(f"**************************************MQ Minimum Count Check: {mq_set_name} (Min: {rule['min_count']})")
+    syntax.append(f"**************************************MQ Minimum Count Check: {mq_set_name} (Min: {rule['min_count']}).")
     syntax.append(f"IF({mq_sum_var} < {rule['min_count']} & ~miss({cols[0]})) {flag_min}=1.") 
     syntax.append(f"EXECUTE.\n")
     generated_flags.append(flag_min)
     
     if rule['max_count'] and rule['max_count'] > 0:
         flag_max = f"{FLAG_PREFIX}{mq_set_name}_Max"
-        syntax.append(f"**************************************MQ Maximum Count Check: {mq_set_name} (Max: {rule['max_count']})")
+        syntax.append(f"**************************************MQ Maximum Count Check: {mq_set_name} (Max: {rule['max_count']}).")
         syntax.append(f"IF({mq_sum_var} > {rule['max_count']}) {flag_max}=1.")
         syntax.append(f"EXECUTE.\n")
         generated_flags.append(flag_max)
