@@ -513,66 +513,75 @@ def configure_straightliner_rules():
                         st.warning("Please select at least two columns for the Straightliner check.")
 
 
-# MQ functions remain here...
 def generate_mq_spss_syntax(rule):
-    """Generates detailed SPSS syntax for a Multi-Select check."""
-    cols = rule['variables']
-    mq_set_name = cols[0].split('_')[0] if cols else 'MQ_Set'
-    mq_list_str = ' '.join(cols)
-    calc_func = "SUM" if rule['count_method'] == "SUM" else "COUNT"
-    mq_sum_var = f"{mq_set_name}_Count"
+    """
+    Generates KnowledgeExcel-compliant MQ syntax
+    Supports SUM and COUNT based on rule['count_method']
+    """
+    cols = rule['variables']                  # ['Q2_1','Q2_2',...]
+    base = cols[0].split('_')[0]               # Q2
+    method = rule.get('count_method', 'SUM')   # 'SUM' or 'COUNT'
+
+    calc_var = f"{method}_{base}"              # Sum_Q2 / Count_Q2
+    flag = f"{FLAG_PREFIX}{base}_{method}"     # xxQ2_Sum / xxQ2_Count
 
     syntax = []
-    generated_flags = []
-    
-    # 1. Count Calculation
-    syntax.append(f"**************************************MQ Count Calculation for Set: {mq_set_name} (Method: {calc_func}).")
-    syntax.append(f"COMPUTE {mq_sum_var} = {calc_func}({mq_list_str}).") 
-    syntax.append(f"EXECUTE.\n")
-    generated_flags.append(mq_sum_var)
-    
-    # 2. Min/Max Count Check
-    flag_min = f"{FLAG_PREFIX}{mq_set_name}_Min"
-    syntax.append(f"**************************************MQ Minimum Count Check: {mq_set_name} (Min: {rule['min_count']}).")
-    syntax.append(f"IF({mq_sum_var} < {rule['min_count']} & ~miss({cols[0]})) {flag_min}=1.") 
-    syntax.append(f"EXECUTE.\n")
-    generated_flags.append(flag_min)
-    
-    if rule['max_count'] and rule['max_count'] > 0:
-        flag_max = f"{FLAG_PREFIX}{mq_set_name}_Max"
-        syntax.append(f"**************************************MQ Maximum Count Check: {mq_set_name} (Max: {rule['max_count']}).")
-        syntax.append(f"IF({mq_sum_var} > {rule['max_count']}) {flag_max}=1.")
-        syntax.append(f"EXECUTE.\n")
-        generated_flags.append(flag_max)
+    flags = []
 
-    # 3. Exclusive Stub Check
-    if rule['exclusive_col'] and rule['exclusive_col'] != 'None' and rule['exclusive_col'] in cols:
-        flag_exclusive = f"{FLAG_PREFIX}{mq_set_name}_Exclusive"
-        exclusive_value = 1 
-        other_cols_str = ' '.join([c for c in cols if c != rule['exclusive_col']])
-        syntax.append(f"**************************************MQ Exclusive Stub Check: {rule['exclusive_col']} vs Others")
-        syntax.append(f"COMPUTE #Other_Count = SUM({other_cols_str}).")
-        syntax.append(f"IF({rule['exclusive_col']}={exclusive_value} & #Other_Count > 0) {flag_exclusive}=1.")
-        syntax.append("EXECUTE.\n")
-        generated_flags.append(flag_exclusive)
-        syntax.append("DELETE VARIABLES #Other_Count.\n") 
-
-    # 4. Other Specify Check
-    if rule.get('other_var') and rule['other_var'] != 'None' and rule.get('other_checkbox_col') and rule['other_checkbox_col'] != 'None':
-         other_syntax, other_flags = generate_other_specify_spss_syntax(rule['other_checkbox_col'], rule['other_var'], rule['other_stub_val'])
-         syntax.extend(other_syntax)
-         generated_flags.extend(other_flags)
-
-    # 5. Skip Logic (EoO/EoC) - uses the base question name as proxy
-    if rule['run_skip'] and rule['trigger_col'] != '-- Select Variable --':
-        target_col = mq_set_name 
-        sl_syntax, sl_flags = generate_skip_spss_syntax(
-            target_col, rule['trigger_col'], rule['trigger_val'], 'MQ'
+    # A. Filter Flag (if any)
+    if rule.get('run_skip') and rule.get('trigger_col') != '-- Select Variable --':
+        syntax.append(
+            f"IF({rule['trigger_col']}={rule['trigger_val']})Flag_{base}=1."
         )
-        syntax.extend(sl_syntax)
-        generated_flags.extend(sl_flags)
+        syntax.append("EXECUTE.\n")
+        flags.append(f"Flag_{base}")
 
-    return syntax, generated_flags
+    # B. SUM / COUNT calculation
+    if method == "SUM":
+        syntax.append(
+            f"Compute {calc_var}= SUM({cols[0]} to {cols[-1]})."
+        )
+    else:  # COUNT
+        count_expr = ", ".join([f"({c}=1)" for c in cols])
+        syntax.append(
+            f"Compute {calc_var}= SUM({count_expr})."
+        )
+
+    syntax.append("EXECUTE.\n")
+
+    # C. Mandatory / Skip Logic
+    if rule.get('run_skip') and rule.get('trigger_col') != '-- Select Variable --':
+        syntax.append(
+            f"If(Flag_{base}=1 & (miss({calc_var}) | {calc_var}<1)) {flag}=1."
+        )
+        syntax.append(
+            f"If((Flag_{base}<>1 | miss(Flag_{base})) & {calc_var}>0) {flag}=2."
+        )
+    else:
+        syntax.append(
+            f"If(miss({calc_var}) | {calc_var}<1) {flag}=1."
+        )
+
+    syntax.append("EXECUTE.\n")
+    flags.append(flag)
+
+    # D. Other Specify (if present)
+    if rule.get('other_checkbox_col') and rule.get('other_var'):
+        chk = rule['other_checkbox_col']
+        other = rule['other_var']
+        other_flag = f"{FLAG_PREFIX}{chk}_Other"
+
+        syntax.append(
+            f"IF({chk}=1 & {other}='') {other_flag}=1."
+        )
+        syntax.append(
+            f"IF(({chk}<>1 | miss({chk})) & {other}<>'') {other_flag}=2."
+        )
+        syntax.append("EXECUTE.\n")
+
+        flags.append(other_flag)
+
+    return syntax, flags
 
 def get_mq_group_from_one(selected_var, all_mq_vars):
     """
