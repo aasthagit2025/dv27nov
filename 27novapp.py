@@ -512,44 +512,85 @@ def configure_straightliner_rules():
                     else:
                         st.warning("Please select at least two columns for the Straightliner check.")
 
-
 def generate_mq_spss_syntax(rule):
-    """
-    Generates KnowledgeExcel-compliant MQ syntax
-    Supports SUM and COUNT based on rule['count_method']
-    """
-    cols = rule['variables']                  # ['Q2_1','Q2_2',...]
-    base = cols[0].split('_')[0]               # Q2
-    method = rule.get('count_method', 'SUM')   # 'SUM' or 'COUNT'
-
-    calc_var = f"{method}_{base}"              # Sum_Q2 / Count_Q2
-    flag = f"{FLAG_PREFIX}{base}_{method}"     # xxQ2_Sum / xxQ2_Count
+    cols = rule['variables']                 # ['Q2_1','Q2_2',...]
+    base = cols[0].split('_')[0]              # Q2
+    method = rule.get('count_method', 'SUM')  # 'SUM' or 'COUNT'
 
     syntax = []
     flags = []
 
-    # A. Filter Flag (if any)
-    if rule.get('run_skip') and rule.get('trigger_col') != '-- Select Variable --':
+    # ================================
+    # MQ COUNT (SPSS COUNT command)
+    # ================================
+    if method == "COUNT":
+        calc_var = f"Count_{base}"
+        flag = f"{FLAG_PREFIX}{base}_Count"
+
+        # Filter flag (optional)
+        if rule.get('run_skip') and rule.get('trigger_col') != '-- Select Variable --':
+            syntax.append(
+                f"If({rule['trigger_col']}={rule['trigger_val']})Flag_{base}=1."
+            )
+            syntax.append("EXECUTE.\n")
+
+        # COUNT command
         syntax.append(
-            f"IF({rule['trigger_col']}={rule['trigger_val']})Flag_{base}=1."
+            f"Count {calc_var} = {cols[0]} to {cols[-1]}(1 thru 10)."
         )
         syntax.append("EXECUTE.\n")
-        flags.append(f"Flag_{base}")
 
-    # B. SUM / COUNT calculation
-    if method == "SUM":
-        syntax.append(
-            f"Compute {calc_var}= SUM({cols[0]} to {cols[-1]})."
-        )
-    else:  # COUNT
-        count_expr = ", ".join([f"({c}=1)" for c in cols])
-        syntax.append(
-            f"Compute {calc_var}= SUM({count_expr})."
-        )
+        # Validation
+        if rule.get('run_skip') and rule.get('trigger_col') != '-- Select Variable --':
+            syntax.append(
+                f"If(Flag_{base}=1 & (miss({calc_var}) | {calc_var}<1)) {flag}=1."
+            )
+            syntax.append(
+                f"If((Flag_{base}<>1 | miss(Flag_{base})) & {calc_var}>0) {flag}=2."
+            )
+        else:
+            syntax.append(
+                f"If(miss({calc_var}) | {calc_var}<1) {flag}=1."
+            )
 
+        syntax.append("EXECUTE.\n")
+        flags.append(flag)
+
+        # Other Specify (string-based)
+        if rule.get('other_checkbox_col') and rule.get('other_var'):
+            chk = rule['other_checkbox_col']
+            other = rule['other_var']
+            other_flag = f"{FLAG_PREFIX}{chk}_Other"
+
+            syntax.append(
+                f"IF({chk}=1 & {other}='') {other_flag}=1."
+            )
+            syntax.append(
+                f"IF(({chk}<>1 | miss({chk})) & {other}<>'') {other_flag}=2."
+            )
+            syntax.append("EXECUTE.\n")
+
+            flags.append(other_flag)
+
+        return syntax, flags   # 🔴 STOP HERE (no SUM leakage)
+
+    # ================================
+    # MQ SUM (numeric SUM)
+    # ================================
+    calc_var = f"Sum_{base}"
+    flag = f"{FLAG_PREFIX}{base}_Sum"
+
+    if rule.get('run_skip') and rule.get('trigger_col') != '-- Select Variable --':
+        syntax.append(
+            f"If({rule['trigger_col']}={rule['trigger_val']})Flag_{base}=1."
+        )
+        syntax.append("EXECUTE.\n")
+
+    syntax.append(
+        f"Compute {calc_var}= SUM({cols[0]} to {cols[-1]})."
+    )
     syntax.append("EXECUTE.\n")
 
-    # C. Mandatory / Skip Logic
     if rule.get('run_skip') and rule.get('trigger_col') != '-- Select Variable --':
         syntax.append(
             f"If(Flag_{base}=1 & (miss({calc_var}) | {calc_var}<1)) {flag}=1."
@@ -565,34 +606,7 @@ def generate_mq_spss_syntax(rule):
     syntax.append("EXECUTE.\n")
     flags.append(flag)
 
-    # D. Other Specify (if present)
-    if rule.get('other_checkbox_col') and rule.get('other_var'):
-        chk = rule['other_checkbox_col']
-        other = rule['other_var']
-        other_flag = f"{FLAG_PREFIX}{chk}_Other"
-
-        syntax.append(
-            f"IF({chk}=1 & {other}='') {other_flag}=1."
-        )
-        syntax.append(
-            f"IF(({chk}<>1 | miss({chk})) & {other}<>'') {other_flag}=2."
-        )
-        syntax.append("EXECUTE.\n")
-
-        flags.append(other_flag)
-
     return syntax, flags
-
-def get_mq_group_from_one(selected_var, all_mq_vars):
-    """
-    Given one MQ variable (e.g. A1_1),
-    return the full MQ group (A1_1 ... A1_n)
-    """
-    if not selected_var:
-        return []
-
-    base = selected_var.split("_")[0]
-    return sorted([v for v in all_mq_vars if v.startswith(base + "_")])
 
 
 def configure_mq_rules(all_variable_options):
